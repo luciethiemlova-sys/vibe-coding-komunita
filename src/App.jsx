@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { supabase } from './lib/supabase'
+import { api } from './lib/api'
 import Auth from './components/Auth'
 import Account from './components/Account'
 import Dashboard from './components/Dashboard'
@@ -8,75 +8,71 @@ import DebugInfo from './components/DebugInfo'
 
 import './index.css'
 
-
-
-
 function App() {
-    const [session, setSession] = useState(null)
-    const [profile, setProfile] = useState(null)
-    const [loading, setLoading] = useState(true)
+    const [session, setSession] = useState(() => {
+        const saved = localStorage.getItem('vibe_session');
+        return saved ? JSON.parse(saved) : null;
+    })
+    const [profile, setProfile] = useState(() => {
+        const saved = localStorage.getItem('vibe_profile');
+        return saved ? JSON.parse(saved) : null;
+    })
+    const [loading, setLoading] = useState(!session)
+    const [showAdmin, setShowAdmin] = useState(false)
 
     useEffect(() => {
-        console.log('App mounting, fetching session...');
-        supabase.auth.getSession().then(({ data: { session } }) => {
-            console.log('Session fetched:', session);
-            setSession(session)
-            if (session) checkProfile(session.user.id)
-            else setLoading(false)
-        }).catch(err => {
-            console.error('Error fetching session:', err);
+        if (session && !profile) {
+            // Re-fetch profile if session exists but profile doesn't
+            setLoading(true);
+            api.login(session.user.id).then(res => {
+                if (res.profile) setProfile(res.profile);
+                setLoading(false);
+            }).catch(() => setLoading(false));
+        } else {
             setLoading(false);
-        })
-
-        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-            console.log('Auth state change:', _event, session);
-            setSession(session)
-            if (session) checkProfile(session.user.id)
-            else setLoading(false)
-        })
-
-        return () => subscription.unsubscribe()
+        }
     }, [])
 
-    async function checkProfile(userId) {
-        console.log('Checking profile for user:', userId);
+    const handleLogin = async (email) => {
+        setLoading(true);
         try {
-            const { data, error } = await supabase
-                .from('profiles')
-                .select('id, name, is_admin')
-
-                .eq('id', userId)
-                .single()
-
-            if (error) console.log('Profile fetch error (expected if new user):', error);
-            if (data) {
-                console.log('Profile found:', data);
-                setProfile(data)
+            const res = await api.login(email);
+            if (res.session) {
+                setSession(res.session);
+                setProfile(res.profile);
+                localStorage.setItem('vibe_session', JSON.stringify(res.session));
+                localStorage.setItem('vibe_profile', JSON.stringify(res.profile));
             }
         } catch (err) {
-            console.error('Unexpected error checking profile:', err)
+            console.error('Login error:', err);
+            alert('Chyba při přihlašování.');
         } finally {
-            setLoading(false)
+            setLoading(false);
         }
+    }
+
+    const handleLogout = () => {
+        setSession(null);
+        setProfile(null);
+        localStorage.removeItem('vibe_session');
+        localStorage.removeItem('vibe_profile');
     }
 
     if (loading) return (
         <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center text-white p-4">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mb-4"></div>
             <p>Načítám aplikaci...</p>
-            <p className="text-xs text-slate-500 mt-2">Pokud toto vidíš déle než pár sekund, zkontroluj konzoli prohlížeče (F12).</p>
         </div>
     )
 
-
     if (!session) {
-        return <Auth />
+        return <Auth onLogin={handleLogin} />
     }
 
-    if (!profile) {
+    if (!profile || !profile.name) {
         return (
             <div className="min-h-screen bg-slate-950 text-white p-8 flex items-center justify-center">
-                <Account session={session} />
+                <Account session={session} profile={profile} onUpdate={(p) => setProfile(p)} />
             </div>
         )
     }
@@ -86,7 +82,6 @@ function App() {
     }
 
     return (
-
         <div className="min-h-screen bg-slate-950 text-white p-8">
             <div className="max-w-4xl mx-auto">
                 <header className="flex justify-between items-center mb-12">
@@ -104,7 +99,7 @@ function App() {
                         )}
                     </div>
                     <button
-                        onClick={() => supabase.auth.signOut()}
+                        onClick={handleLogout}
                         className="px-4 py-2 text-sm font-medium text-slate-400 hover:text-white transition-colors"
                     >
                         Odhlásit se
@@ -118,8 +113,5 @@ function App() {
         </div>
     )
 }
-
-
-
 
 export default App

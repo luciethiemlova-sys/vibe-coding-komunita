@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { supabase } from '../lib/supabase'
+import { api } from '../lib/api'
 import { Calendar, Users, Plus, Trash2, ArrowLeft, Download } from 'lucide-react'
 
 export default function AdminDashboard({ onBack }) {
@@ -19,36 +19,31 @@ export default function AdminDashboard({ onBack }) {
 
     async function fetchData() {
         setLoading(true)
-        if (view === 'events') {
-            const { data } = await supabase.from('events').select('*').order('created_at', { ascending: false })
-            setEvents(data || [])
-        } else {
-            // Join with private_contacts to see emails/phones
-            const { data, error } = await supabase
-                .from('profiles')
-                .select(`
-                    id, name, bio, created_at,
-                    private_contacts (email, phone)
-                `)
-            console.log('Members data:', data, error)
-            setMembers(data || [])
+        try {
+            if (view === 'events') {
+                const data = await api.getEvents();
+                setEvents(data || [])
+            } else {
+                const data = await api.getMembers();
+                setMembers(data || [])
+            }
+        } catch (err) {
+            console.error('Error fetching admin data:', err);
+        } finally {
+            setLoading(false)
         }
-        setLoading(false)
     }
 
     async function handleCreateEvent(e) {
         e.preventDefault()
-        const { data, error } = await supabase.from('events').insert({
+        const res = await api.createEvent({
             title: newTitle,
             description: newDesc,
-            venue: newVenue,
-            is_active: true
-        }).select().single()
+            venue: newVenue
+        });
 
-        if (error) alert(error.message)
+        if (res.error) alert(res.error)
         else {
-            // Deactivate all other events
-            await supabase.from('events').update({ is_active: false }).neq('id', data.id)
             setNewTitle('')
             setNewDesc('')
             fetchData()
@@ -56,27 +51,21 @@ export default function AdminDashboard({ onBack }) {
     }
 
     async function toggleEventStatus(id, currentStatus) {
-        if (!currentStatus) {
-            // Activating this event - deactivate others
-            await supabase.from('events').update({ is_active: false }).neq('id', id)
-        }
-        await supabase.from('events').update({ is_active: !currentStatus }).eq('id', id)
-        fetchData()
+        // Simple toggle logic for Google Sheets (implementing as needed)
+        alert('Tato funkce bude v Google Sheets verzi dostupná brzy. Prozatím upravte přímo v tabulce.');
     }
 
     async function deleteEvent(id) {
-        if (confirm('Opravdu chcete tuto událost smazat?')) {
-            await supabase.from('events').delete().eq('id', id)
-            fetchData()
+        if (confirm('Opravdu chcete tuto událost smazat? Smažte ji prosím přímo v Google Tabulce pro jistotu.')) {
+            // Simplified delete guidance for now
         }
     }
 
     const exportToCSV = () => {
-        const headers = ['Jmeno', 'Email', 'Telefon', 'Bio']
+        const headers = ['Jmeno', 'Email', 'Bio']
         const rows = members.map(m => [
             m.name,
-            m.private_contacts?.email || '',
-            m.private_contacts?.phone || '',
+            m.id,
             m.bio || ''
         ])
 
@@ -199,8 +188,7 @@ export default function AdminDashboard({ onBack }) {
                                 <thead className="bg-slate-950 text-slate-500 text-xs font-bold uppercase">
                                     <tr>
                                         <th className="px-6 py-4">Jméno</th>
-                                        <th className="px-6 py-4">Kontakt</th>
-                                        <th className="px-6 py-4">Bio</th>
+                                        <th className="px-6 py-4">Kontakt (E-mail)</th>
                                         <th className="px-6 py-4">Bio</th>
                                     </tr>
                                 </thead>
@@ -212,16 +200,10 @@ export default function AdminDashboard({ onBack }) {
                                                 <div className="text-[10px] text-slate-500">{new Date(m.created_at).toLocaleDateString()}</div>
                                             </td>
                                             <td className="px-6 py-4">
-                                                <div className="text-sm">{m.private_contacts?.email}</div>
-                                                <div className="text-sm text-slate-400">{m.private_contacts?.phone}</div>
+                                                <div className="text-sm">{m.id}</div>
                                             </td>
                                             <td className="px-6 py-4 max-w-xs">
                                                 <p className="text-sm text-slate-300 truncate" title={m.bio}>{m.bio || '-'}</p>
-                                            </td>
-                                            <td className="px-6 py-4">
-                                                <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${m.private_contacts?.email ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
-                                                    Magic-ready
-                                                </span>
                                             </td>
                                         </tr>
                                     ))}
