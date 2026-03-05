@@ -11,16 +11,27 @@
  * 7. Copy the Web App URL and put it in your .env file as VITE_API_URL.
  */
 
+const VERSION = "1.0.5";
+
 function doGet(e) {
   try {
-    const action = e.parameter.action;
+    const action = String(e.parameter.action || "").trim().toLowerCase();
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     
+    // DIAGNOSTIKA - uvidíme přesně, co je v tabulce
     if (action === 'diagnostics') {
       const sheets = ss.getSheets().map(s => s.getName());
-      const required = ["profiles", "events", "topics", "topic_votes", "date_options", "date_votes"];
-      const missing = required.filter(r => !sheets.includes(r));
-      return jsonResponse({ sheets, required, missing, status: missing.length === 0 ? 'OK' : 'MISSING_SHEETS' });
+      const headers = {};
+      const sheetData = {};
+      sheets.forEach(name => {
+        const s = ss.getSheetByName(name);
+        if (s) {
+          const vals = s.getDataRange().getValues();
+          headers[name] = vals[0];
+          sheetData[name] = vals.length > 1 ? vals[1] : "EMPTY";
+        }
+      });
+      return jsonResponse({ version: VERSION, sheets, headers, sampleRow: sheetData, status: 'OK' });
     }
 
     if (action === 'getEvent') {

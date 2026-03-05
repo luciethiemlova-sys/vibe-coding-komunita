@@ -36,11 +36,12 @@ export default function DebugInfo({ session, profile, loading }) {
                 </button>
                 <button
                     onClick={async () => {
+                        const diagUrl = `${apiUrl}?action=diagnostics`;
                         try {
-                            const res = await fetch(`${apiUrl}?action=diagnostics`).then(r => r.json());
-                            alert("DIAGNOSTIKA:\n" + JSON.stringify(res, null, 2));
+                            const res = await fetch(diagUrl).then(r => r.json());
+                            alert(`URL: ${diagUrl}\n\nDATA:\n${JSON.stringify(res, null, 2)}`);
                         } catch (e) {
-                            alert("CHYBA DIAGNOSTIKY: " + e.message + "\nZkontrolujte VITE_API_URL v .env a zda je skript nasazen jako Web App.");
+                            alert(`CHYBA PŘIPOJENÍ:\nURL: ${diagUrl}\n\nERROR: ${e.message}\n\nMožná příčina: CORS, špatné URL v .env, nebo skript není nasazen jako 'Anyone'.`);
                         }
                     }}
                     style={{ background: '#333', color: '#0f0', border: '1px solid #0f0', padding: '4px 8px', cursor: 'pointer', borderRadius: '4px' }}
