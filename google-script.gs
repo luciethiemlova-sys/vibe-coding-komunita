@@ -16,62 +16,78 @@ function doGet(e) {
     const action = e.parameter.action;
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     
+    if (action === 'diagnostics') {
+      const sheets = ss.getSheets().map(s => s.getName());
+      const required = ["profiles", "events", "topics", "topic_votes", "date_options", "date_votes"];
+      const missing = required.filter(r => !sheets.includes(r));
+      return jsonResponse({ sheets, required, missing, status: missing.length === 0 ? 'OK' : 'MISSING_SHEETS' });
+    }
+
     if (action === 'getEvent') {
       const sheet = ss.getSheetByName('events');
       if (!sheet) return jsonResponse({ event: null, error: 'Sheet "events" not found' });
       const data = sheet.getDataRange().getValues();
       if (data.length <= 1) return jsonResponse({ event: null });
       
-      const headers = data.shift();
+      const headers = data.shift().map(h => String(h).toLowerCase().trim());
       const activeIndex = headers.indexOf('is_active');
-      const activeEvent = data.find(row => row[activeIndex] === true || row[activeIndex] === 'TRUE');
+      if (activeIndex === -1) return jsonResponse({ event: null, error: 'Column "is_active" not found in events sheet' });
+      
+      const activeEvent = data.find(row => {
+        const val = String(row[activeIndex]).toUpperCase();
+        return val === 'TRUE' || val === '1' || row[activeIndex] === true;
+      });
       
       if (!activeEvent) return jsonResponse({ event: null });
       
       const eventObj = {};
-      headers.forEach((h, i) => { if(h) eventObj[h] = activeEvent[i]; });
+      const originalHeaders = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+      originalHeaders.forEach((h, i) => { if(h) eventObj[h] = activeEvent[i]; });
       return jsonResponse({ event: eventObj });
     }
 
     if (action === 'getTopics') {
       const eventId = e.parameter.eventId;
-      const topics = getSheetData('topics').filter(t => String(t.event_id) === String(eventId));
+      const topics = getSheetData('topics').filter(t => String(t.event_id || t.Event_Id) === String(eventId));
       const profiles = getSheetData('profiles');
       const votes = getSheetData('topic_votes');
       
-      const result = topics.map(t => ({
-        ...t,
-        author: { name: profiles.find(p => String(p.id) === String(t.author_id))?.name || 'Anonym' },
-        votes: votes.filter(v => String(v.topic_id) === String(t.id))
-      }));
+      const result = topics.map(t => {
+        const id = t.id || t.Id;
+        return {
+          ...t,
+          id: id,
+          author: { name: profiles.find(p => String(p.id || p.Id).toLowerCase() === String(t.author_id || t.Author_Id).toLowerCase())?.name || 'Anonym' },
+          votes: votes.filter(v => String(v.topic_id || v.Topic_Id) === String(id))
+        };
+      });
       
       return jsonResponse(result);
     }
 
     if (action === 'getDateOptions') {
       const eventId = e.parameter.eventId;
-      const options = getSheetData('date_options').filter(o => String(o.event_id) === String(eventId));
+      const options = getSheetData('date_options').filter(o => String(o.event_id || o.Event_Id) === String(eventId));
       const votes = getSheetData('date_votes');
       
-      const result = options.map(o => ({
-        ...o,
-        votes: votes.filter(v => String(v.date_option_id) === String(o.id))
-      }));
+      const result = options.map(o => {
+        const id = o.id || o.Id;
+        return {
+          ...o,
+          id: id,
+          votes: votes.filter(v => String(v.date_option_id || v.Date_Option_Id) === String(id))
+        };
+      });
       
       return jsonResponse(result);
     }
 
-    if (action === 'getEvents') {
-      return jsonResponse(getSheetData('events'));
-    }
-
-    if (action === 'getMembers') {
-      return jsonResponse(getSheetData('profiles'));
-    }
+    if (action === 'getEvents') return jsonResponse(getSheetData('events'));
+    if (action === 'getMembers') return jsonResponse(getSheetData('profiles'));
 
     return jsonResponse({ error: 'Invalid action: ' + action });
   } catch (err) {
-    return jsonResponse({ error: err.toString() });
+    return jsonResponse({ error: err.toString(), stack: err.stack });
   }
 }
 
@@ -84,7 +100,7 @@ function doPost(e) {
     if (action === 'login') {
       const email = String(data.email).toLowerCase().trim();
       const profiles = getSheetData('profiles');
-      let profile = profiles.find(p => String(p.id).toLowerCase() === email);
+      let profile = profiles.find(p => String(p.id || p.Id).toLowerCase() === email);
       
       if (!profile) {
         const sheet = ss.getSheetByName('profiles');
@@ -104,7 +120,7 @@ function doPost(e) {
     if (action === 'toggleTopicVote') {
       const sheet = ss.getSheetByName('topic_votes');
       const votes = getSheetData('topic_votes');
-      const existingIndex = votes.findIndex(v => String(v.topic_id) === String(data.topicId) && String(v.profile_id).toLowerCase() === String(data.profileId).toLowerCase());
+      const existingIndex = votes.findIndex(v => String(v.topic_id || v.Topic_Id) === String(data.topicId) && String(v.profile_id || v.Profile_Id).toLowerCase() === String(data.profileId).toLowerCase());
       
       if (existingIndex > -1) {
         sheet.deleteRow(existingIndex + 2);
@@ -117,7 +133,7 @@ function doPost(e) {
     if (action === 'toggleDateVote') {
       const sheet = ss.getSheetByName('date_votes');
       const votes = getSheetData('date_votes');
-      const existingIndex = votes.findIndex(v => String(v.date_option_id) === String(data.optionId) && String(v.profile_id).toLowerCase() === String(data.profileId).toLowerCase());
+      const existingIndex = votes.findIndex(v => String(v.date_option_id || v.Date_Option_Id) === String(data.optionId) && String(v.profile_id || v.Profile_Id).toLowerCase() === String(data.profileId).toLowerCase());
       
       if (existingIndex > -1) {
         sheet.deleteRow(existingIndex + 2);
@@ -130,13 +146,13 @@ function doPost(e) {
     if (action === 'saveProfile') {
       const sheet = ss.getSheetByName('profiles');
       const dataRows = sheet.getDataRange().getValues();
-      const headers = dataRows.shift();
+      const headers = dataRows[0].map(h => String(h).toLowerCase().trim());
       const idIndex = headers.indexOf('id');
-      const rowIndex = dataRows.findIndex(row => String(row[idIndex]).toLowerCase() === String(data.id).toLowerCase());
+      const rowIndex = dataRows.findIndex((row, idx) => idx > 0 && String(row[idIndex]).toLowerCase() === String(data.id).toLowerCase());
       
       if (rowIndex > -1) {
-        sheet.getRange(rowIndex + 2, headers.indexOf('name') + 1).setValue(data.name);
-        sheet.getRange(rowIndex + 2, headers.indexOf('bio') + 1).setValue(data.bio);
+        sheet.getRange(rowIndex + 1, headers.indexOf('name') + 1).setValue(data.name);
+        sheet.getRange(rowIndex + 1, headers.indexOf('bio') + 1).setValue(data.bio);
       }
       return jsonResponse({ success: true });
     }
@@ -148,11 +164,11 @@ function doPost(e) {
       
       // Deactivate other events
       const dataRows = eventSheet.getDataRange().getValues();
-      const headers = dataRows.shift();
+      const headers = dataRows[0].map(h => String(h).toLowerCase().trim());
       const activeIndex = headers.indexOf('is_active');
       if (activeIndex > -1) {
-        for (let i = 0; i < dataRows.length; i++) {
-          eventSheet.getRange(i + 2, activeIndex + 1).setValue(false);
+        for (let i = 1; i < dataRows.length; i++) {
+          eventSheet.getRange(i + 1, activeIndex + 1).setValue(false);
         }
       }
 
@@ -170,7 +186,7 @@ function doPost(e) {
 
     return jsonResponse({ error: 'Invalid action: ' + action });
   } catch (err) {
-    return jsonResponse({ error: err.toString() });
+    return jsonResponse({ error: err.toString(), stack: err.stack });
   }
 }
 
@@ -179,7 +195,7 @@ function getSheetData(name) {
   if (!sheet) return [];
   const data = sheet.getDataRange().getValues();
   if (data.length <= 1) return [];
-  const headers = data.shift();
+  const headers = data.shift().map(h => String(h).toLowerCase().trim());
   return data.map(row => {
     const obj = {};
     headers.forEach((h, i) => { if(h) obj[h] = row[i]; });

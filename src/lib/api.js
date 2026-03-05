@@ -65,4 +65,5 @@ export const api = {
     getEvents: () => request('getEvents'),
     createEvent: (eventData) => postRequest('createEvent', eventData),
     getMembers: () => request('getMembers'),
+    getDiagnostics: () => request('diagnostics'),
 };

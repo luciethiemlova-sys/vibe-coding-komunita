@@ -16,7 +16,11 @@ export default function Dashboard({ session }) {
     async function fetchActiveEvent() {
         try {
             setLoading(true)
-            const { event: eventData } = await api.getEvent();
+            const res = await api.getEvent();
+            if (res.error) {
+                alert(`Chyba načítání: ${res.error}`);
+            }
+            const eventData = res.event;
             setEvent(eventData)
 
             if (eventData) {
@@ -25,6 +29,7 @@ export default function Dashboard({ session }) {
             }
         } catch (error) {
             console.error('Error fetching event:', error.message)
+            alert(`Chyba připojení: ${error.message}`);
         } finally {
             setLoading(false)
         }
