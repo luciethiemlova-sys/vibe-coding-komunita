@@ -190,26 +190,30 @@ function doPost(e) {
   }
 }
 
+function normalizeHeader(h) {
+  let clean = String(h).toLowerCase().trim()
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "") // remove accents
+    .replace(/[^a-z0-9_]/g, "_") // replace special chars with underscore
+    .replace(/_+/g, "_"); // remove duplicate underscores
+
+  // Map Czech/English synonyms to standard keys
+  if (clean === 'termin' || clean === 'datum' || clean === 'nazev' || clean === 'text' || clean === 'label' || clean.includes('termin')) return 'label';
+  if (clean === 'id_udalosti' || clean === 'udalost_id' || clean === 'id_event' || clean === 'event_id') return 'event_id';
+  if (clean === 'autor_id' || clean === 'author_id' || clean === 'vytvoril') return 'author_id';
+  if (clean === 'profil_id' || clean === 'profile_id' || clean === 'user_id' || clean === 'uzivatel_id') return 'profile_id';
+  if (clean === 'vytvoreno' || clean === 'created_at' || clean === 'cas') return 'created_at';
+  if (clean === 'is_active' || clean === 'aktivni') return 'is_active';
+  
+  return clean;
+}
+
 function getSheetData(name) {
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(name);
   if (!sheet) return [];
   const data = sheet.getDataRange().getValues();
   if (data.length <= 1) return [];
   const originalHeaders = data.shift();
-  
-  // Normalize headers: lowercase, trim, remove accents, and map common Czech terms
-  const headers = originalHeaders.map(h => {
-    let clean = String(h).toLowerCase().trim()
-      .normalize("NFD").replace(/[\u0300-\u036f]/g, ""); // Remove accents
-    
-    // Map Czech synonyms to standard English keys used in frontend
-    if (clean === 'termin' || clean === 'datum' || clean === 'nazev') return 'label';
-    if (clean === 'id_udalosti' || clean === 'udalost_id') return 'event_id';
-    if (clean === 'autor_id') return 'author_id';
-    if (clean === 'profil_id') return 'profile_id';
-    if (clean === 'vytvoreno') return 'created_at';
-    return clean;
-  });
+  const headers = originalHeaders.map(h => normalizeHeader(h));
   
   return data
     .filter(row => row.some(cell => String(cell).trim() !== ""))
