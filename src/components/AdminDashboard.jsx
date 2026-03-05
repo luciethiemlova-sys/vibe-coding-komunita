@@ -12,6 +12,7 @@ export default function AdminDashboard({ onBack }) {
     const [newTitle, setNewTitle] = useState('')
     const [newDesc, setNewDesc] = useState('')
     const [newVenue, setNewVenue] = useState('Sbeerka, Ostrava-Poruba')
+    const [newDates, setNewDates] = useState(['', '', '']) // Start with 3 empty slots
 
     useEffect(() => {
         fetchData()
@@ -39,15 +40,28 @@ export default function AdminDashboard({ onBack }) {
         const res = await api.createEvent({
             title: newTitle,
             description: newDesc,
-            venue: newVenue
+            venue: newVenue,
+            dates: newDates.filter(d => d.trim() !== '')
         });
 
         if (res.error) alert(res.error)
         else {
             setNewTitle('')
             setNewDesc('')
+            setNewDates(['', '', ''])
             fetchData()
+            alert('Událost s hlasováním byla úspěšně vytvořena!')
         }
+    }
+
+    const handleDateChange = (index, value) => {
+        const updatedDates = [...newDates]
+        updatedDates[index] = value
+        setNewDates(updatedDates)
+    }
+
+    const addDateField = () => {
+        setNewDates([...newDates, ''])
     }
 
     async function toggleEventStatus(id, currentStatus) {
@@ -135,6 +149,28 @@ export default function AdminDashboard({ onBack }) {
                                         onChange={e => setNewVenue(e.target.value)}
                                         className="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2"
                                     />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-500 mb-2 uppercase">Možnosti termínů</label>
+                                    <div className="space-y-2">
+                                        {newDates.map((date, index) => (
+                                            <input
+                                                key={index}
+                                                type="text"
+                                                placeholder={`Termín ${index + 1} (např. Pondělí 18:00)`}
+                                                value={date}
+                                                onChange={e => handleDateChange(index, e.target.value)}
+                                                className="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2 text-sm"
+                                            />
+                                        ))}
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={addDateField}
+                                        className="mt-2 text-xs text-purple-400 hover:text-purple-300 font-bold flex items-center gap-1"
+                                    >
+                                        <Plus size={14} /> Přidat další termín
+                                    </button>
                                 </div>
                                 <button type="submit" className="w-full bg-purple-600 hover:bg-purple-500 py-3 rounded-lg font-bold transition-all">
                                     Vytvořit událost

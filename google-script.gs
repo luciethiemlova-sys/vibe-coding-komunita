@@ -134,9 +134,32 @@ function doPost(e) {
   }
 
   if (action === 'createEvent') {
-    const sheet = ss.getSheetByName('events');
-    const id = Utilities.getUuid();
-    sheet.appendRow([id, data.title, data.description, data.venue, true, new Date()]);
+    const eventSheet = ss.getSheetByName('events');
+    const dateSheet = ss.getSheetByName('date_options');
+    const eventId = Utilities.getUuid();
+    
+    // Deactivate other events
+    const dataRows = eventSheet.getDataRange().getValues();
+    const headers = dataRows.shift();
+    const activeIndex = headers.indexOf('is_active');
+    if (activeIndex > -1) {
+      for (let i = 0; i < dataRows.length; i++) {
+        eventSheet.getRange(i + 2, activeIndex + 1).setValue(false);
+      }
+    }
+
+    // Add new event
+    eventSheet.appendRow([eventId, data.title, data.description, data.venue, true, new Date()]);
+    
+    // Add date options
+    if (data.dates && Array.isArray(data.dates)) {
+      data.dates.forEach(label => {
+        if (label.trim()) {
+          dateSheet.appendRow([Utilities.getUuid(), eventId, label.trim(), new Date()]);
+        }
+      });
+    }
+    
     return jsonResponse({ success: true });
   }
 

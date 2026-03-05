@@ -58,10 +58,7 @@ export default function Dashboard({ session }) {
     }
 
     async function toggleDateVote(optionId) {
-        // Implementing toggleDateVote in parallel with toggleTopicVote in api/script
-        // For simplicity reusing toggleTopicVote or adding toggleDateVote later if needed
-        // Assuming we update script for this too
-        await api.toggleTopicVote(optionId, session.user.id); // Placeholder/Reuse
+        await api.toggleDateVote(optionId, session.user.id);
         fetchDateOptions(event.id)
     }
 
