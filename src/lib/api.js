@@ -40,7 +40,13 @@ async function postRequest(action, data = {}) {
             },
             redirect: 'follow'
         });
-        return await response.json();
+
+        if (!response.ok) {
+            return { success: false, error: `HTTP Error: ${response.status}` };
+        }
+
+        const result = await response.json();
+        return result;
     } catch (err) {
         console.error(`POST Error (${action}):`, err);
         return { success: false, error: err.message };

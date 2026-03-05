@@ -52,21 +52,41 @@ export default function Dashboard({ session }) {
         }
     }
 
+    const [voting, setVoting] = useState(false)
+
     async function toggleVote(topicId) {
-        await api.toggleTopicVote(topicId, session.user.id);
-        fetchTopics(event.id)
+        if (voting) return
+        setVoting(true)
+        try {
+            const res = await api.toggleTopicVote(topicId, session.user.id);
+            if (res.error) alert(`Nepodařilo se hlasovat: ${res.error}`)
+            else await fetchTopics(event.id)
+        } catch (err) {
+            alert(`Chyba sítě: ${err.message}`)
+        } finally {
+            setVoting(false)
+        }
     }
 
     async function toggleDateVote(optionId) {
-        await api.toggleDateVote(optionId, session.user.id);
-        fetchDateOptions(event.id)
+        if (voting) return
+        setVoting(true)
+        try {
+            const res = await api.toggleDateVote(optionId, session.user.id);
+            if (res.error) alert(`Nepodařilo se hlasovat o termínu: ${res.error}`)
+            else await fetchDateOptions(event.id)
+        } catch (err) {
+            alert(`Chyba sítě: ${err.message}`)
+        } finally {
+            setVoting(false)
+        }
     }
 
     if (loading) return <div className="text-center py-12">Načítám událost...</div>
     if (!event) return <div className="text-center py-12">Momentálně není naplánovaná žádná událost.</div>
 
     return (
-        <div className="space-y-8">
+        <div className={`space-y-8 ${voting ? 'opacity-70 pointer-events-none' : ''} transition-opacity`}>
             {/* Event Header */}
             <section className="bg-slate-900 border border-slate-800 rounded-2xl p-8 relative overflow-hidden">
                 <div className="relative z-10">
@@ -100,7 +120,7 @@ export default function Dashboard({ session }) {
                             onChange={(e) => setNewTopic(e.target.value)}
                         />
                         <button type="submit" className="bg-purple-600 hover:bg-purple-500 px-4 py-2 rounded-lg font-bold text-sm transition-colors">
-                            Přidat
+                            {voting ? '...' : 'Přidat'}
                         </button>
                     </form>
 
@@ -114,7 +134,7 @@ export default function Dashboard({ session }) {
                                 </div>
                                 <button
                                     onClick={() => toggleVote(topic.id)}
-                                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border transition-all ${topic.votes.some(v => v.profile_id === session.user.id)
+                                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border transition-all ${topic.votes?.some(v => String(v.profile_id).toLowerCase() === String(session.user.id).toLowerCase())
                                         ? 'bg-purple-600/20 border-purple-500 text-purple-400'
                                         : 'border-slate-700 text-slate-400 hover:border-slate-600'
                                         }`}
@@ -138,13 +158,13 @@ export default function Dashboard({ session }) {
                             <button
                                 key={option.id}
                                 onClick={() => toggleDateVote(option.id)}
-                                className={`w-full text-left p-4 rounded-xl border transition-all flex items-center justify-between ${option.votes.some(v => v.profile_id === session.user.id)
+                                className={`w-full text-left p-4 rounded-xl border transition-all flex items-center justify-between ${option.votes?.some(v => String(v.profile_id).toLowerCase() === String(session.user.id).toLowerCase())
                                     ? 'bg-pink-600/10 border-pink-500/50 ring-1 ring-pink-500/50'
                                     : 'bg-slate-900 border-slate-800 hover:border-slate-700'
                                     }`}
                             >
                                 <div className="flex items-center gap-3">
-                                    <div className={`w-2 h-2 rounded-full ${option.votes.some(v => v.profile_id === session.user.id) ? 'bg-pink-500' : 'bg-slate-700'}`}></div>
+                                    <div className={`w-2 h-2 rounded-full ${option.votes?.some(v => String(v.profile_id).toLowerCase() === String(session.user.id).toLowerCase()) ? 'bg-pink-500' : 'bg-slate-700'}`}></div>
                                     <span className="font-medium">{option.label}</span>
                                 </div>
                                 <div className="text-xs font-bold text-slate-500">
@@ -152,6 +172,7 @@ export default function Dashboard({ session }) {
                                 </div>
                             </button>
                         ))}
+                        {dateOptions.length === 0 && <p className="text-slate-500 text-sm italic py-4">Pro tuto událost nejsou vypsány žádné termíny hlasování.</p>}
                     </div>
                 </section>
             </div>
