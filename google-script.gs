@@ -195,10 +195,24 @@ function getSheetData(name) {
   if (!sheet) return [];
   const data = sheet.getDataRange().getValues();
   if (data.length <= 1) return [];
-  const headers = data.shift().map(h => String(h).toLowerCase().trim());
+  const originalHeaders = data.shift();
+  
+  // Normalize headers: lowercase, trim, remove accents, and map common Czech terms
+  const headers = originalHeaders.map(h => {
+    let clean = String(h).toLowerCase().trim()
+      .normalize("NFD").replace(/[\u0300-\u036f]/g, ""); // Remove accents
+    
+    // Map Czech synonyms to standard English keys used in frontend
+    if (clean === 'termin' || clean === 'datum' || clean === 'nazev') return 'label';
+    if (clean === 'id_udalosti' || clean === 'udalost_id') return 'event_id';
+    if (clean === 'autor_id') return 'author_id';
+    if (clean === 'profil_id') return 'profile_id';
+    if (clean === 'vytvoreno') return 'created_at';
+    return clean;
+  });
   
   return data
-    .filter(row => row.some(cell => cell !== "")) // Skip empty rows
+    .filter(row => row.some(cell => String(cell).trim() !== ""))
     .map(row => {
       const obj = {};
       headers.forEach((h, i) => { if(h) obj[h] = row[i]; });

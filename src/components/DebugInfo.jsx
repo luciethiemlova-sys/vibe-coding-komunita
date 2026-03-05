@@ -34,6 +34,15 @@ export default function DebugInfo({ session, profile, loading }) {
                 >
                     REFRESH
                 </button>
+                <button
+                    onClick={async () => {
+                        const res = await fetch(`${apiUrl}?action=diagnostics`).then(r => r.json());
+                        alert(JSON.stringify(res, null, 2));
+                    }}
+                    style={{ background: '#333', color: '#0f0', border: '1px solid #0f0', padding: '4px 8px', cursor: 'pointer', borderRadius: '4px' }}
+                >
+                    DIAG
+                </button>
             </div>
         </div>
     )
