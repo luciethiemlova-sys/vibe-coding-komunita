@@ -36,8 +36,12 @@ export default function DebugInfo({ session, profile, loading }) {
                 </button>
                 <button
                     onClick={async () => {
-                        const res = await fetch(`${apiUrl}?action=diagnostics`).then(r => r.json());
-                        alert(JSON.stringify(res, null, 2));
+                        try {
+                            const res = await fetch(`${apiUrl}?action=diagnostics`).then(r => r.json());
+                            alert("DIAGNOSTIKA:\n" + JSON.stringify(res, null, 2));
+                        } catch (e) {
+                            alert("CHYBA DIAGNOSTIKY: " + e.message + "\nZkontrolujte VITE_API_URL v .env a zda je skript nasazen jako Web App.");
+                        }
                     }}
                     style={{ background: '#333', color: '#0f0', border: '1px solid #0f0', padding: '4px 8px', cursor: 'pointer', borderRadius: '4px' }}
                 >
