@@ -170,7 +170,7 @@ export default function Dashboard({ session }) {
                             >
                                 <div className="flex items-center gap-3">
                                     <div className={`w-2 h-2 rounded-full ${option.votes?.some(v => String(v.profile_id).toLowerCase() === String(session.user.id).toLowerCase()) ? 'bg-pink-500' : 'bg-slate-700'}`}></div>
-                                    <span className="font-medium">{option.label}</span>
+                                    <span className="font-medium">{option.label || option.termin || option.datum || option.text || 'Termín neuveden'}</span>
                                 </div>
                                 <div className="text-xs font-bold text-slate-500">
                                     {option.votes?.length || 0} hlasů

@@ -196,11 +196,14 @@ function getSheetData(name) {
   const data = sheet.getDataRange().getValues();
   if (data.length <= 1) return [];
   const headers = data.shift().map(h => String(h).toLowerCase().trim());
-  return data.map(row => {
-    const obj = {};
-    headers.forEach((h, i) => { if(h) obj[h] = row[i]; });
-    return obj;
-  });
+  
+  return data
+    .filter(row => row.some(cell => cell !== "")) // Skip empty rows
+    .map(row => {
+      const obj = {};
+      headers.forEach((h, i) => { if(h) obj[h] = row[i]; });
+      return obj;
+    });
 }
 
 function jsonResponse(data) {
