@@ -34,7 +34,7 @@ function doGet(e) {
       return jsonResponse({ version: VERSION, sheets, headers, sampleRow: sheetData, status: 'OK' });
     }
 
-    if (action === 'getEvent') {
+    if (action === 'getevent') {
       const sheet = ss.getSheetByName('events');
       if (!sheet) return jsonResponse({ event: null, error: 'Sheet "events" not found' });
       const data = sheet.getDataRange().getValues();
@@ -57,7 +57,7 @@ function doGet(e) {
       return jsonResponse({ event: eventObj });
     }
 
-    if (action === 'getTopics') {
+    if (action === 'gettopics') {
       const eventId = e.parameter.eventId;
       const topics = getSheetData('topics').filter(t => String(t.event_id || t.Event_Id) === String(eventId));
       const profiles = getSheetData('profiles');
@@ -76,7 +76,7 @@ function doGet(e) {
       return jsonResponse(result);
     }
 
-    if (action === 'getDateOptions') {
+    if (action === 'getdateoptions') {
       const eventId = e.parameter.eventId;
       const options = getSheetData('date_options').filter(o => String(o.event_id || o.Event_Id) === String(eventId));
       const votes = getSheetData('date_votes');
@@ -93,8 +93,8 @@ function doGet(e) {
       return jsonResponse(result);
     }
 
-    if (action === 'getEvents') return jsonResponse(getSheetData('events'));
-    if (action === 'getMembers') return jsonResponse(getSheetData('profiles'));
+    if (action === 'getevents') return jsonResponse(getSheetData('events'));
+    if (action === 'getmembers') return jsonResponse(getSheetData('profiles'));
 
     return jsonResponse({ error: 'Invalid action: ' + action });
   } catch (err) {
@@ -121,14 +121,14 @@ function doPost(e) {
       return jsonResponse({ session: { user: { id: email, email: email } }, profile: profile });
     }
 
-    if (action === 'addTopic') {
+    if (action === 'addtopic') {
       const sheet = ss.getSheetByName('topics');
       const id = Utilities.getUuid();
       sheet.appendRow([id, data.eventId, data.text, data.authorId, new Date()]);
       return jsonResponse({ success: true });
     }
 
-    if (action === 'toggleTopicVote') {
+    if (action === 'toggletopicvote') {
       const sheet = ss.getSheetByName('topic_votes');
       const votes = getSheetData('topic_votes');
       const existingIndex = votes.findIndex(v => String(v.topic_id || v.Topic_Id) === String(data.topicId) && String(v.profile_id || v.Profile_Id).toLowerCase() === String(data.profileId).toLowerCase());
@@ -141,7 +141,7 @@ function doPost(e) {
       return jsonResponse({ success: true });
     }
 
-    if (action === 'toggleDateVote') {
+    if (action === 'toggledatevote') {
       const sheet = ss.getSheetByName('date_votes');
       const votes = getSheetData('date_votes');
       const existingIndex = votes.findIndex(v => String(v.date_option_id || v.Date_Option_Id) === String(data.optionId) && String(v.profile_id || v.Profile_Id).toLowerCase() === String(data.profileId).toLowerCase());
@@ -154,7 +154,7 @@ function doPost(e) {
       return jsonResponse({ success: true });
     }
 
-    if (action === 'saveProfile') {
+    if (action === 'saveprofile') {
       const sheet = ss.getSheetByName('profiles');
       const dataRows = sheet.getDataRange().getValues();
       const headers = dataRows[0].map(h => String(h).toLowerCase().trim());
@@ -168,7 +168,7 @@ function doPost(e) {
       return jsonResponse({ success: true });
     }
 
-    if (action === 'createEvent') {
+    if (action === 'createevent') {
       const eventSheet = ss.getSheetByName('events');
       const dateSheet = ss.getSheetByName('date_options');
       const eventId = Utilities.getUuid();
@@ -208,7 +208,7 @@ function normalizeHeader(h) {
     .replace(/_+/g, "_"); // remove duplicate underscores
 
   // Map Czech/English synonyms to standard keys
-  if (clean === 'termin' || clean === 'datum' || clean === 'nazev' || clean === 'text' || clean === 'label' || clean.includes('termin')) return 'label';
+  if (clean === 'termin' || clean === 'datum' || clean === 'nazev' || clean === 'text' || clean === 'label' || clean.includes('termin') || clean === 'cas' || clean === 'moznost') return 'label';
   if (clean === 'id_udalosti' || clean === 'udalost_id' || clean === 'id_event' || clean === 'event_id') return 'event_id';
   if (clean === 'autor_id' || clean === 'author_id' || clean === 'vytvoril') return 'author_id';
   if (clean === 'profil_id' || clean === 'profile_id' || clean === 'user_id' || clean === 'uzivatel_id') return 'profile_id';
