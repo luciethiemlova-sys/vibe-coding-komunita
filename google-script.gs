@@ -105,7 +105,7 @@ function doGet(e) {
 function doPost(e) {
   try {
     const data = JSON.parse(e.postData.contents);
-    const action = data.action;
+    const action = String(data.action || "").trim().toLowerCase();
     const ss = SpreadsheetApp.getActiveSpreadsheet();
 
     if (action === 'login') {
