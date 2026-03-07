@@ -99,10 +99,17 @@ export default function Dashboard({ session, profile }) {
         if (votingId) return
         setVotingId(optionId)
         try {
+            console.log('Toggling date vote for:', optionId);
             const res = await api.toggleDateVote(optionId, session.user.id);
-            if (res.error) alert(`Nepodařilo se hlasovat o termínu: ${res.error}`)
-            else await fetchDateOptions(event.id)
+            console.log('Toggle date vote response:', res);
+            if (res.error) {
+                console.error('Voting error:', res.error);
+                alert(`Nepodařilo se hlasovat o termínu: ${res.error}`);
+            } else {
+                await fetchDateOptions(event.id);
+            }
         } catch (err) {
+            console.error('Network/System error during voting:', err);
             alert(`Chyba sítě: ${err.message}`)
         } finally {
             setVotingId(null)
