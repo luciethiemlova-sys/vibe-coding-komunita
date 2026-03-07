@@ -54,13 +54,17 @@ export default function Dashboard({ session, profile }) {
 
     async function handleAddTopic(e) {
         e.preventDefault()
-        if (!newTopic.trim()) return
-
-        const res = await api.addTopic(event.id, newTopic, session.user.id);
-        if (res.error) alert(res.error)
-        else {
-            setNewTopic('')
-            fetchTopics(event.id)
+        if (!newTopic.trim() || votingId) return
+        setVotingId('new-topic')
+        try {
+            const res = await api.addTopic(event.id, newTopic, session.user.id);
+            if (res.error) alert(res.error)
+            else {
+                setNewTopic('')
+                fetchTopics(event.id)
+            }
+        } finally {
+            setVotingId(null)
         }
     }
 
@@ -101,7 +105,7 @@ export default function Dashboard({ session, profile }) {
         } catch (err) {
             alert(`Chyba sítě: ${err.message}`)
         } finally {
-            setVoting(false)
+            setVotingId(null)
         }
     }
 
@@ -143,7 +147,7 @@ export default function Dashboard({ session, profile }) {
                             onChange={(e) => setNewTopic(e.target.value)}
                         />
                         <button type="submit" className="bg-purple-600 hover:bg-purple-500 px-4 py-2 rounded-lg font-bold text-sm transition-colors">
-                            {voting ? '...' : 'Přidat'}
+                            {votingId === 'new-topic' ? '...' : 'Přidat'}
                         </button>
                     </form>
 
