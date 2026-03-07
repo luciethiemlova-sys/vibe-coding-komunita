@@ -106,7 +106,7 @@ function App() {
                     </button>
                 </header>
                 <main>
-                    <Dashboard session={session} />
+                    <Dashboard session={session} profile={profile} />
                 </main>
             </div>
             <DebugInfo session={session} profile={profile} loading={loading} />

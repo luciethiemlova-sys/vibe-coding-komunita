@@ -198,6 +198,20 @@ function doPost(e) {
       return jsonResponse({ success: true });
     }
 
+    if (action === 'deletetopic') {
+      const sheet = ss.getSheetByName('topics');
+      const dataRows = sheet.getDataRange().getValues();
+      const headers = dataRows[0].map(h => normalizeHeader(h));
+      const idIndex = headers.indexOf('id');
+      const rowIndex = dataRows.findIndex((row, idx) => idx > 0 && String(row[idIndex]) === String(data.topicId));
+      
+      if (rowIndex > -1) {
+        sheet.deleteRow(rowIndex + 1);
+        return jsonResponse({ success: true });
+      }
+      return jsonResponse({ error: 'Topic not found' });
+    }
+
     if (action === 'saveevent') {
       const sheet = ss.getSheetByName('events');
       const dataRows = sheet.getDataRange().getValues();
@@ -229,7 +243,9 @@ function normalizeHeader(h) {
     .replace(/^_|_$/g, ""); // odstranění podtržítek na začátku/konci
 
   // Mapování synonym na standardní klíče
-  const labelMatches = ['termin', 'dat', 'text', 'label', 'cas', 'moznost', 'nazev_moznosti', 'kdy', 'info'];
+  if (clean === 'text') return 'text'; // Zachovat 'text' jako 'text' (důležité pro témata)
+  
+  const labelMatches = ['termin', 'dat', 'label', 'cas', 'moznost', 'nazev_moznosti', 'kdy', 'info'];
   if (labelMatches.some(m => clean.includes(m)) && !clean.includes('udalost') && !clean.includes('event')) return 'label';
   
   if (clean === 'id_udalosti' || clean === 'udalost_id' || clean === 'id_event' || clean === 'event_id') return 'event_id';

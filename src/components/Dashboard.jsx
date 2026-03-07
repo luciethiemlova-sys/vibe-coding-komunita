@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react'
 import { api } from '../lib/api'
-import { ThumbsUp, Plus, Calendar, MapPin } from 'lucide-react'
+import { ThumbsUp, Plus, Calendar, MapPin, Trash2 } from 'lucide-react'
 
-export default function Dashboard({ session }) {
+export default function Dashboard({ session, profile }) {
     const [event, setEvent] = useState(null)
     const [topics, setTopics] = useState([])
     const [dateOptions, setDateOptions] = useState([])
@@ -80,6 +80,17 @@ export default function Dashboard({ session }) {
         }
     }
 
+    async function handleDeleteTopic(topicId) {
+        if (!confirm('Opravdu chcete toto téma smazat?')) return
+        try {
+            const res = await api.deleteTopic(topicId);
+            if (res.error) alert(`Nepodařilo se smazat téma: ${res.error}`)
+            else await fetchTopics(event.id)
+        } catch (err) {
+            alert(`Chyba sítě: ${err.message}`)
+        }
+    }
+
     async function toggleDateVote(optionId) {
         if (voting) return
         setVoting(true)
@@ -144,16 +155,27 @@ export default function Dashboard({ session }) {
                                     <p className="text-white font-medium mb-1">{topic.text || topic.label || 'Bez textu'}</p>
                                     <p className="text-xs text-slate-500">Navrhl/a {topic.author?.name || 'Anonym'}</p>
                                 </div>
-                                <button
-                                    onClick={() => toggleVote(topic.id)}
-                                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border transition-all ${topic.votes?.some(v => String(v.profile_id).toLowerCase() === String(session.user.id).toLowerCase())
-                                        ? 'bg-purple-600/20 border-purple-500 text-purple-400'
-                                        : 'border-slate-700 text-slate-400 hover:border-slate-600'
-                                        }`}
-                                >
-                                    <ThumbsUp size={14} />
-                                    <span className="text-xs font-bold">{topic.votes?.length || 0}</span>
-                                </button>
+                                <div className="flex items-center gap-2">
+                                    <button
+                                        onClick={() => toggleVote(topic.id)}
+                                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border transition-all ${topic.votes?.some(v => String(v.profile_id).toLowerCase() === String(session.user.id).toLowerCase())
+                                            ? 'bg-purple-600/20 border-purple-500 text-purple-400'
+                                            : 'border-slate-700 text-slate-400 hover:border-slate-600'
+                                            }`}
+                                    >
+                                        <ThumbsUp size={14} />
+                                        <span className="text-xs font-bold">{topic.votes?.length || 0}</span>
+                                    </button>
+                                    {profile?.is_admin && (
+                                        <button
+                                            onClick={() => handleDeleteTopic(topic.id)}
+                                            className="p-1.5 text-slate-500 hover:text-red-500 transition-colors"
+                                            title="Smazat téma"
+                                        >
+                                            <Trash2 size={16} />
+                                        </button>
+                                    )}
+                                </div>
                             </div>
                         ))}
                     </div>

@@ -57,6 +57,7 @@ export const api = {
     login: (email) => postRequest('login', { email }),
     getEvent: () => request('getEvent'),
     getTopics: (eventId) => request('getTopics', { eventId }),
+    deleteTopic: (topicId) => postRequest('deletetopic', { topicId }),
     getDateOptions: (eventId) => request('getDateOptions', { eventId }),
     addTopic: (eventId, text, authorId) => postRequest('addTopic', { eventId, text, authorId }),
     toggleTopicVote: (topicId, profileId) => postRequest('toggleTopicVote', { topicId, profileId }),
