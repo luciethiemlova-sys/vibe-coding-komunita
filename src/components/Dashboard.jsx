@@ -100,29 +100,33 @@ export default function Dashboard({ session, profile }) {
     }
 
     async function toggleDateVote(optionId) {
+        console.log('--- CLICK DETECTED ---');
+        console.log('OptionId:', optionId, 'Current votingId:', votingId);
+
         if (votingId) {
             console.warn('Voting already in progress for:', votingId);
             return;
         }
+
+        alert(`Kliknuto na ID: ${optionId}`);
         setVotingId(optionId)
         try {
-            console.log('--- VOTING START ---');
-            console.log('Action: toggleDateVote', 'OptionId:', optionId, 'UserId:', session.user.id);
+            console.log('Initiating date vote toggle for:', optionId, 'user:', session.user.id);
             const res = await api.toggleDateVote(optionId, session.user.id);
-            console.log('API Response:', res);
+            console.log('Toggle date vote response received:', res);
             if (res.error) {
-                console.error('SERVER RETURNED ERROR:', res.error);
-                alert(`Nepodařilo se hlasovat o termínu: ${res.error}`)
+                console.error('SERVER ERROR during voting:', res.error);
+                alert(`Nepodařilo se hlasovat o termínu: ${res.error}`);
             } else {
-                console.log('Success! Fetching updated options for event:', event.id);
-                await fetchDateOptions(event.id)
+                console.log('Success! Refreshing date options...');
+                await fetchDateOptions(event.id);
             }
         } catch (err) {
-            console.error('FETCH EXCEPTION:', err);
+            console.error('CRITICAL NETWORK/FETCH ERROR:', err);
             alert(`Chyba sítě: ${err.message}`)
         } finally {
             setVotingId(null)
-            console.log('--- VOTING END ---');
+            console.log('Voting process finished for:', optionId);
         }
     }
 
