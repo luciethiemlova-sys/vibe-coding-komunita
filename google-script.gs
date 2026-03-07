@@ -133,10 +133,16 @@ function doPost(e) {
 
     if (action === 'toggletopicvote') {
       const sheet = ss.getSheetByName('topic_votes');
+      if (!sheet) return jsonResponse({ error: 'Sheet "topic_votes" not found' });
+      
       const votesRows = sheet.getDataRange().getValues();
       const headers = votesRows[0].map(h => normalizeHeader(h));
       const topicIdIdx = headers.indexOf('topic_id');
       const profileIdIdx = headers.indexOf('profile_id');
+      
+      if (topicIdIdx === -1 || profileIdIdx === -1) {
+        return jsonResponse({ error: 'Required columns (topic_id, profile_id) not found in topic_votes' });
+      }
       
       const existingRowIndex = votesRows.findIndex((row, idx) => 
         idx > 0 && 
@@ -147,17 +153,26 @@ function doPost(e) {
       if (existingRowIndex > -1) {
         sheet.deleteRow(existingRowIndex + 1);
       } else {
-        sheet.appendRow([data.topicId, data.profileId]);
+        const newRow = new Array(headers.length).fill("");
+        newRow[topicIdIdx] = data.topicId;
+        newRow[profileIdIdx] = data.profileId;
+        sheet.appendRow(newRow);
       }
       return jsonResponse({ success: true });
     }
 
     if (action === 'toggledatevote') {
       const sheet = ss.getSheetByName('date_votes');
+      if (!sheet) return jsonResponse({ error: 'Sheet "date_votes" not found' });
+      
       const votesRows = sheet.getDataRange().getValues();
       const headers = votesRows[0].map(h => normalizeHeader(h));
       const optionIdIdx = headers.indexOf('date_option_id');
       const profileIdIdx = headers.indexOf('profile_id');
+      
+      if (optionIdIdx === -1 || profileIdIdx === -1) {
+        return jsonResponse({ error: 'Required columns (date_option_id, profile_id) not found in date_votes' });
+      }
       
       const existingRowIndex = votesRows.findIndex((row, idx) => 
         idx > 0 && 
@@ -168,7 +183,10 @@ function doPost(e) {
       if (existingRowIndex > -1) {
         sheet.deleteRow(existingRowIndex + 1);
       } else {
-        sheet.appendRow([data.optionId, data.profileId]);
+        const newRow = new Array(headers.length).fill("");
+        newRow[optionIdIdx] = data.optionId;
+        newRow[profileIdIdx] = data.profileId;
+        sheet.appendRow(newRow);
       }
       return jsonResponse({ success: true });
     }
@@ -273,8 +291,8 @@ function normalizeHeader(h) {
   if (clean === 'title' || clean === 'nazev' || clean === 'titulek') return 'title';
   if (clean === 'description' || clean === 'popis' || clean === 'informace') return 'description';
   if (clean === 'venue' || clean === 'misto' || clean === 'lokace') return 'venue';
-  if (clean === 'date_option_id' || clean === 'date_option' || clean === 'id_moznosti_terminu') return 'date_option_id';
-  if (clean === 'topic_id' || clean === 'id_tematu') return 'topic_id';
+  if (clean === 'date_option_id' || clean === 'date_option' || clean === 'id_moznosti_terminu' || clean === 'option_id' || clean === 'termin_id') return 'date_option_id';
+  if (clean === 'topic_id' || clean === 'id_tematu' || clean === 'tema_id') return 'topic_id';
   
   return clean;
 }

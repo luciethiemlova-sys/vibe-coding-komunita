@@ -64,11 +64,11 @@ export default function Dashboard({ session, profile }) {
         }
     }
 
-    const [voting, setVoting] = useState(false)
+    const [votingId, setVotingId] = useState(null)
 
     async function toggleVote(topicId) {
-        if (voting) return
-        setVoting(true)
+        if (votingId) return
+        setVotingId(topicId)
         try {
             const res = await api.toggleTopicVote(topicId, session.user.id);
             if (res.error) alert(`Nepodařilo se hlasovat: ${res.error}`)
@@ -76,7 +76,7 @@ export default function Dashboard({ session, profile }) {
         } catch (err) {
             alert(`Chyba sítě: ${err.message}`)
         } finally {
-            setVoting(false)
+            setVotingId(null)
         }
     }
 
@@ -92,8 +92,8 @@ export default function Dashboard({ session, profile }) {
     }
 
     async function toggleDateVote(optionId) {
-        if (voting) return
-        setVoting(true)
+        if (votingId) return
+        setVotingId(optionId)
         try {
             const res = await api.toggleDateVote(optionId, session.user.id);
             if (res.error) alert(`Nepodařilo se hlasovat o termínu: ${res.error}`)
@@ -109,7 +109,7 @@ export default function Dashboard({ session, profile }) {
     if (!event) return <div className="text-center py-12">Momentálně není naplánovaná žádná událost.</div>
 
     return (
-        <div className={`space-y-8 ${voting ? 'opacity-70 pointer-events-none' : ''} transition-opacity`}>
+        <div className="space-y-8 transition-opacity">
             {/* Event Header */}
             <section className="bg-slate-900 border border-slate-800 rounded-2xl p-8 relative overflow-hidden">
                 <div className="relative z-10">
@@ -150,7 +150,10 @@ export default function Dashboard({ session, profile }) {
                     <div className="space-y-3">
                         {topics.length === 0 && <p className="text-slate-500 text-sm">Zatím žádná témata. Buď první!</p>}
                         {topics.map(topic => (
-                            <div key={topic.id} className="bg-slate-900 border border-slate-800 p-4 rounded-xl flex items-start justify-between gap-4">
+                            <div
+                                key={topic.id}
+                                className={`bg-slate-900 border border-slate-800 p-4 rounded-xl flex items-start justify-between gap-4 transition-opacity ${votingId === topic.id ? 'opacity-50 pointer-events-none' : ''}`}
+                            >
                                 <div>
                                     <p className="text-white font-medium mb-1">{topic.text || topic.label || 'Bez textu'}</p>
                                     <p className="text-xs text-slate-500">Navrhl/a {topic.author?.name || 'Anonym'}</p>
@@ -192,9 +195,10 @@ export default function Dashboard({ session, profile }) {
                             <button
                                 key={option.id}
                                 onClick={() => toggleDateVote(option.id)}
-                                className={`w-full text-left p-4 rounded-xl border transition-all flex items-center justify-between ${option.votes?.some(v => String(v.profile_id).toLowerCase() === String(session.user.id).toLowerCase())
-                                    ? 'bg-pink-600/10 border-pink-500/50 ring-1 ring-pink-500/50'
-                                    : 'bg-slate-900 border-slate-800 hover:border-slate-700'
+                                className={`w-full text-left p-4 rounded-xl border transition-all flex items-center justify-between ${votingId === option.id ? 'opacity-50 pointer-events-none scale-[0.98]' : ''
+                                    } ${option.votes?.some(v => String(v.profile_id).toLowerCase() === String(session.user.id).toLowerCase())
+                                        ? 'bg-pink-600/10 border-pink-500/50 ring-1 ring-pink-500/50'
+                                        : 'bg-slate-900 border-slate-800 hover:border-slate-700'
                                     }`}
                             >
                                 <div className="flex items-center gap-3">
