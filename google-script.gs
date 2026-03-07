@@ -40,20 +40,23 @@ function doGet(e) {
       const data = sheet.getDataRange().getValues();
       if (data.length <= 1) return jsonResponse({ event: null });
       
-      const headers = data.shift().map(h => String(h).toLowerCase().trim());
+      const originalHeaders = data.shift();
+      const headers = originalHeaders.map(h => normalizeHeader(h));
       const activeIndex = headers.indexOf('is_active');
+      
       if (activeIndex === -1) return jsonResponse({ event: null, error: 'Column "is_active" not found in events sheet' });
       
-      const activeEvent = data.find(row => {
+      const activeEventRow = data.find(row => {
         const val = String(row[activeIndex]).toUpperCase();
         return val === 'TRUE' || val === '1' || row[activeIndex] === true;
       });
       
-      if (!activeEvent) return jsonResponse({ event: null });
+      if (!activeEventRow) return jsonResponse({ event: null });
       
       const eventObj = {};
-      const originalHeaders = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
-      originalHeaders.forEach((h, i) => { if(h) eventObj[h] = activeEvent[i]; });
+      headers.forEach((h, i) => { 
+        if(h) eventObj[h] = activeEventRow[i]; 
+      });
       return jsonResponse({ event: eventObj });
     }
 
@@ -195,6 +198,22 @@ function doPost(e) {
       return jsonResponse({ success: true });
     }
 
+    if (action === 'saveevent') {
+      const sheet = ss.getSheetByName('events');
+      const dataRows = sheet.getDataRange().getValues();
+      const headers = dataRows[0].map(h => normalizeHeader(h));
+      const idIndex = headers.indexOf('id');
+      const rowIndex = dataRows.findIndex((row, idx) => idx > 0 && String(row[idIndex]) === String(data.id));
+      
+      if (rowIndex > -1) {
+        if (data.title) sheet.getRange(rowIndex + 1, headers.indexOf('title') + 1).setValue(data.title);
+        if (data.description) sheet.getRange(rowIndex + 1, headers.indexOf('description') + 1).setValue(data.description);
+        if (data.venue) sheet.getRange(rowIndex + 1, headers.indexOf('venue') + 1).setValue(data.venue);
+        return jsonResponse({ success: true });
+      }
+      return jsonResponse({ error: 'Event not found' });
+    }
+
     return jsonResponse({ error: 'Invalid action: ' + action });
   } catch (err) {
     return jsonResponse({ error: err.toString(), stack: err.stack });
@@ -202,18 +221,26 @@ function doPost(e) {
 }
 
 function normalizeHeader(h) {
+  if (!h) return "";
   let clean = String(h).toLowerCase().trim()
-    .normalize("NFD").replace(/[\u0300-\u036f]/g, "") // remove accents
-    .replace(/[^a-z0-9_]/g, "_") // replace special chars with underscore
-    .replace(/_+/g, "_"); // remove duplicate underscores
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "") // odstranění diakritiky
+    .replace(/[^a-z0-9_]/g, "_") // nahrazení speciálních znaků podtržítkem
+    .replace(/_+/g, "_") // odstranění duplicitních podtržítek
+    .replace(/^_|_$/g, ""); // odstranění podtržítek na začátku/konci
 
-  // Map Czech/English synonyms to standard keys
-  if (clean === 'termin' || clean === 'datum' || clean === 'nazev' || clean === 'text' || clean === 'label' || clean.includes('termin') || clean === 'cas' || clean === 'moznost') return 'label';
+  // Mapování synonym na standardní klíče
+  const labelMatches = ['termin', 'dat', 'text', 'label', 'cas', 'moznost', 'nazev_moznosti', 'kdy', 'info'];
+  if (labelMatches.some(m => clean.includes(m)) && !clean.includes('udalost') && !clean.includes('event')) return 'label';
+  
   if (clean === 'id_udalosti' || clean === 'udalost_id' || clean === 'id_event' || clean === 'event_id') return 'event_id';
   if (clean === 'autor_id' || clean === 'author_id' || clean === 'vytvoril') return 'author_id';
   if (clean === 'profil_id' || clean === 'profile_id' || clean === 'user_id' || clean === 'uzivatel_id') return 'profile_id';
-  if (clean === 'vytvoreno' || clean === 'created_at' || clean === 'cas') return 'created_at';
-  if (clean === 'is_active' || clean === 'aktivni') return 'is_active';
+  if (clean === 'vytvoreno' || clean === 'created_at' || clean === 'cas_vytvoreni') return 'created_at';
+  if (clean === 'is_active' || clean === 'aktivni' || clean === 'stav') return 'is_active';
+  if (clean === 'is_admin' || clean === 'admin' || clean === 'spravce') return 'is_admin';
+  if (clean === 'title' || clean === 'nazev' || clean === 'titulek') return 'title';
+  if (clean === 'description' || clean === 'popis' || clean === 'informace') return 'description';
+  if (clean === 'venue' || clean === 'misto' || clean === 'lokace') return 'venue';
   
   return clean;
 }

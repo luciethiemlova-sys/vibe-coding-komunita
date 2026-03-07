@@ -24,8 +24,14 @@ export default function Dashboard({ session }) {
             setEvent(eventData)
 
             if (eventData) {
-                fetchTopics(eventData.id)
-                fetchDateOptions(eventData.id)
+                // Normalizace ID - může přijít jako 'id' nebo 'ID' nebo 'Id'
+                const eventId = eventData.id || eventData.ID || eventData.Id;
+                if (eventId) {
+                    fetchTopics(eventId)
+                    fetchDateOptions(eventId)
+                } else {
+                    console.error('Event ID not found in data:', eventData);
+                }
             }
         } catch (error) {
             console.error('Error fetching event:', error.message)
@@ -42,6 +48,7 @@ export default function Dashboard({ session }) {
 
     async function fetchDateOptions(eventId) {
         const data = await api.getDateOptions(eventId);
+        console.log('Date options fetched:', data);
         setDateOptions(data || [])
     }
 
@@ -170,7 +177,16 @@ export default function Dashboard({ session }) {
                             >
                                 <div className="flex items-center gap-3">
                                     <div className={`w-2 h-2 rounded-full ${option.votes?.some(v => String(v.profile_id).toLowerCase() === String(session.user.id).toLowerCase()) ? 'bg-pink-500' : 'bg-slate-700'}`}></div>
-                                    <span className="font-medium">{option.label || option.termin || option.datum || option.text || 'Termín neuveden'}</span>
+                                    <span className="font-medium">
+                                        {(() => {
+                                            const label = option.label || option.termin || option.datum || option.text || option.Label || option.Kdy || option.kdy;
+                                            if (label) return label;
+                                            const fallback = Object.entries(option).find(([k, v]) =>
+                                                typeof v === 'string' && v.length > 2 && !['id', 'event_id', 'profile_id'].includes(k.toLowerCase())
+                                            );
+                                            return fallback ? fallback[1] : 'Termín neuveden';
+                                        })()}
+                                    </span>
                                 </div>
                                 <div className="text-xs font-bold text-slate-500">
                                     {option.votes?.length || 0} hlasů

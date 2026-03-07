@@ -8,11 +8,11 @@ export default function AdminDashboard({ onBack }) {
     const [loading, setLoading] = useState(true)
     const [view, setView] = useState('events') // 'events' or 'members'
 
-    // New Event State
     const [newTitle, setNewTitle] = useState('')
     const [newDesc, setNewDesc] = useState('')
     const [newVenue, setNewVenue] = useState('Sbeerka, Ostrava-Poruba')
     const [newDates, setNewDates] = useState(['', '', '']) // Start with 3 empty slots
+    const [editingEvent, setEditingEvent] = useState(null)
 
     useEffect(() => {
         fetchData()
@@ -35,23 +35,60 @@ export default function AdminDashboard({ onBack }) {
         }
     }
 
-    async function handleCreateEvent(e) {
+    async function handleSubmit(e) {
         e.preventDefault()
-        const res = await api.createEvent({
-            title: newTitle,
-            description: newDesc,
-            venue: newVenue,
-            dates: newDates.filter(d => d.trim() !== '')
-        });
+        setLoading(true)
+        try {
+            if (editingEvent) {
+                const res = await api.updateEvent(editingEvent.id, {
+                    title: newTitle,
+                    description: newDesc,
+                    venue: newVenue
+                });
+                if (res.error) alert(res.error)
+                else {
+                    alert('Událost byla úspěšně aktualizována!')
+                    handleCancelEdit()
+                    fetchData()
+                }
+            } else {
+                const res = await api.createEvent({
+                    title: newTitle,
+                    description: newDesc,
+                    venue: newVenue,
+                    dates: newDates.filter(d => d.trim() !== '')
+                });
 
-        if (res.error) alert(res.error)
-        else {
-            setNewTitle('')
-            setNewDesc('')
-            setNewDates(['', '', ''])
-            fetchData()
-            alert('Událost s hlasováním byla úspěšně vytvořena!')
+                if (res.error) alert(res.error)
+                else {
+                    setNewTitle('')
+                    setNewDesc('')
+                    setNewDates(['', '', ''])
+                    fetchData()
+                    alert('Událost s hlasováním byla úspěšně vytvořena!')
+                }
+            }
+        } catch (err) {
+            alert('Chyba: ' + err.message)
+        } finally {
+            setLoading(false)
         }
+    }
+
+    const handleEditClick = (ev) => {
+        setEditingEvent(ev)
+        setNewTitle(ev.title || '')
+        setNewDesc(ev.description || '')
+        setNewVenue(ev.venue || 'Sbeerka, Ostrava-Poruba')
+        window.scrollTo({ top: 0, behavior: 'smooth' })
+    }
+
+    const handleCancelEdit = () => {
+        setEditingEvent(null)
+        setNewTitle('')
+        setNewDesc('')
+        setNewVenue('Sbeerka, Ostrava-Poruba')
+        setNewDates(['', '', ''])
     }
 
     const handleDateChange = (index, value) => {
@@ -123,9 +160,10 @@ export default function AdminDashboard({ onBack }) {
                         {/* Create Event Form */}
                         <section className="bg-slate-900 border border-slate-800 p-6 rounded-2xl h-fit">
                             <h2 className="text-xl font-bold mb-6 flex items-center gap-2">
-                                <Plus className="text-purple-500" /> Nová událost
+                                {editingEvent ? <Plus className="text-pink-500 rotate-45" /> : <Plus className="text-purple-500" />}
+                                {editingEvent ? 'Upravit událost' : 'Nová událost'}
                             </h2>
-                            <form onSubmit={handleCreateEvent} className="space-y-4">
+                            <form onSubmit={handleSubmit} className="space-y-4">
                                 <div>
                                     <label className="block text-xs font-bold text-slate-500 mb-1 uppercase">Název</label>
                                     <input
@@ -150,31 +188,44 @@ export default function AdminDashboard({ onBack }) {
                                         className="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2"
                                     />
                                 </div>
-                                <div>
-                                    <label className="block text-xs font-bold text-slate-500 mb-2 uppercase">Možnosti termínů</label>
-                                    <div className="space-y-2">
-                                        {newDates.map((date, index) => (
-                                            <input
-                                                key={index}
-                                                type="text"
-                                                placeholder={`Termín ${index + 1} (např. Pondělí 18:00)`}
-                                                value={date}
-                                                onChange={e => handleDateChange(index, e.target.value)}
-                                                className="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2 text-sm"
-                                            />
-                                        ))}
+                                {!editingEvent && (
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-500 mb-2 uppercase">Možnosti termínů</label>
+                                        <div className="space-y-2">
+                                            {newDates.map((date, index) => (
+                                                <input
+                                                    key={index}
+                                                    type="text"
+                                                    placeholder={`Termín ${index + 1} (např. Pondělí 18:00)`}
+                                                    value={date}
+                                                    onChange={e => handleDateChange(index, e.target.value)}
+                                                    className="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2 text-sm"
+                                                />
+                                            ))}
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={addDateField}
+                                            className="mt-2 text-xs text-purple-400 hover:text-purple-300 font-bold flex items-center gap-1"
+                                        >
+                                            <Plus size={14} /> Přidat další termín
+                                        </button>
                                     </div>
-                                    <button
-                                        type="button"
-                                        onClick={addDateField}
-                                        className="mt-2 text-xs text-purple-400 hover:text-purple-300 font-bold flex items-center gap-1"
-                                    >
-                                        <Plus size={14} /> Přidat další termín
+                                )}
+                                <div className="flex gap-2">
+                                    <button type="submit" className="flex-1 bg-purple-600 hover:bg-purple-500 py-3 rounded-lg font-bold transition-all disabled:opacity-50">
+                                        {editingEvent ? 'Uložit změny' : 'Vytvořit událost'}
                                     </button>
+                                    {editingEvent && (
+                                        <button
+                                            type="button"
+                                            onClick={handleCancelEdit}
+                                            className="px-4 bg-slate-800 hover:bg-slate-700 rounded-lg font-bold transition-all"
+                                        >
+                                            Zrušit
+                                        </button>
+                                    )}
                                 </div>
-                                <button type="submit" className="w-full bg-purple-600 hover:bg-purple-500 py-3 rounded-lg font-bold transition-all">
-                                    Vytvořit událost
-                                </button>
                             </form>
                         </section>
 
@@ -192,6 +243,12 @@ export default function AdminDashboard({ onBack }) {
                                             <p className="text-slate-400 text-sm mt-1">{ev.venue}</p>
                                         </div>
                                         <div className="flex gap-2">
+                                            <button
+                                                onClick={() => handleEditClick(ev)}
+                                                className="px-3 py-1 rounded-lg text-xs font-bold border border-slate-700 hover:bg-slate-800 transition-colors"
+                                            >
+                                                Upravit
+                                            </button>
                                             <button
                                                 onClick={() => toggleEventStatus(ev.id, ev.is_active)}
                                                 className={`px-3 py-1 rounded-lg text-xs font-bold border ${ev.is_active ? 'border-slate-700 hover:bg-slate-800' : 'border-purple-500 bg-purple-600 hover:bg-purple-500'}`}

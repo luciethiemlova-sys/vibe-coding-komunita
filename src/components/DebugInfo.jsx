@@ -24,6 +24,7 @@ export default function DebugInfo({ session, profile, loading }) {
                 <p>Uživatel: {session ? 'Přihlášen' : 'Anonym'}</p>
                 <p>Profil: {profile ? 'Nalezen' : 'Chybí'}</p>
                 <p>Backend: {apiUrl ? 'URL OK' : '!! CHYBÍ URL !!'}</p>
+                <p>Kód verze: <span style={{ color: '#fff' }}>1.0.6 (Update)</span></p>
                 {profile && <p>Role: {profile.is_admin ? 'ADMIN' : 'MEMBER'}</p>}
                 {profile && <p>ID: {String(profile.id).substring(0, 10)}...</p>}
             </div>

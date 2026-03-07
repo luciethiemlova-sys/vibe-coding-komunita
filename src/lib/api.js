@@ -64,6 +64,7 @@ export const api = {
     saveProfile: (id, name, bio) => postRequest('saveProfile', { id, name, bio }),
     getEvents: () => request('getEvents'),
     createEvent: (eventData) => postRequest('createEvent', eventData),
+    updateEvent: (id, eventData) => postRequest('saveevent', { id, ...eventData }),
     getMembers: () => request('getMembers'),
     getDiagnostics: () => request('diagnostics'),
 };
