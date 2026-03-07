@@ -141,7 +141,7 @@ export default function Dashboard({ session }) {
                         {topics.map(topic => (
                             <div key={topic.id} className="bg-slate-900 border border-slate-800 p-4 rounded-xl flex items-start justify-between gap-4">
                                 <div>
-                                    <p className="text-white font-medium mb-1">{topic.text}</p>
+                                    <p className="text-white font-medium mb-1">{topic.text || topic.label || 'Bez textu'}</p>
                                     <p className="text-xs text-slate-500">Navrhl/a {topic.author?.name || 'Anonym'}</p>
                                 </div>
                                 <button
