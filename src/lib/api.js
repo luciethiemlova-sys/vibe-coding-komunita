@@ -31,6 +31,7 @@ async function request(action, data = {}, method = 'GET') {
 async function postRequest(action, data = {}) {
     // Apps Script is tricky with CORS and POST. 
     // A common workaround is to use fetch with redirect: 'follow'
+    console.log(`API REQUEST [POST]: ${action}`, data);
     try {
         const response = await fetch(API_URL, {
             method: 'POST',
@@ -42,13 +43,15 @@ async function postRequest(action, data = {}) {
         });
 
         if (!response.ok) {
+            console.error(`API RESPONSE ERROR [${action}]: HTTP ${response.status}`);
             return { success: false, error: `HTTP Error: ${response.status}` };
         }
 
         const result = await response.json();
+        console.log(`API RESPONSE SUCCESS [${action}]:`, result);
         return result;
     } catch (err) {
-        console.error(`POST Error (${action}):`, err);
+        console.error(`API FETCH EXCEPTION [${action}]:`, err);
         return { success: false, error: err.message };
     }
 }
