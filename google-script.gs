@@ -133,11 +133,19 @@ function doPost(e) {
 
     if (action === 'toggletopicvote') {
       const sheet = ss.getSheetByName('topic_votes');
-      const votes = getSheetData('topic_votes');
-      const existingIndex = votes.findIndex(v => String(v.topic_id || v.Topic_Id) === String(data.topicId) && String(v.profile_id || v.Profile_Id).toLowerCase() === String(data.profileId).toLowerCase());
+      const votesRows = sheet.getDataRange().getValues();
+      const headers = votesRows[0].map(h => normalizeHeader(h));
+      const topicIdIdx = headers.indexOf('topic_id');
+      const profileIdIdx = headers.indexOf('profile_id');
       
-      if (existingIndex > -1) {
-        sheet.deleteRow(existingIndex + 2);
+      const existingRowIndex = votesRows.findIndex((row, idx) => 
+        idx > 0 && 
+        String(row[topicIdIdx]) === String(data.topicId) && 
+        String(row[profileIdIdx]).toLowerCase() === String(data.profileId).toLowerCase()
+      );
+      
+      if (existingRowIndex > -1) {
+        sheet.deleteRow(existingRowIndex + 1);
       } else {
         sheet.appendRow([data.topicId, data.profileId]);
       }
@@ -146,11 +154,19 @@ function doPost(e) {
 
     if (action === 'toggledatevote') {
       const sheet = ss.getSheetByName('date_votes');
-      const votes = getSheetData('date_votes');
-      const existingIndex = votes.findIndex(v => String(v.date_option_id || v.Date_Option_Id) === String(data.optionId) && String(v.profile_id || v.Profile_Id).toLowerCase() === String(data.profileId).toLowerCase());
+      const votesRows = sheet.getDataRange().getValues();
+      const headers = votesRows[0].map(h => normalizeHeader(h));
+      const optionIdIdx = headers.indexOf('date_option_id');
+      const profileIdIdx = headers.indexOf('profile_id');
       
-      if (existingIndex > -1) {
-        sheet.deleteRow(existingIndex + 2);
+      const existingRowIndex = votesRows.findIndex((row, idx) => 
+        idx > 0 && 
+        String(row[optionIdIdx]) === String(data.optionId) && 
+        String(row[profileIdIdx]).toLowerCase() === String(data.profileId).toLowerCase()
+      );
+      
+      if (existingRowIndex > -1) {
+        sheet.deleteRow(existingRowIndex + 1);
       } else {
         sheet.appendRow([data.optionId, data.profileId]);
       }
@@ -257,6 +273,8 @@ function normalizeHeader(h) {
   if (clean === 'title' || clean === 'nazev' || clean === 'titulek') return 'title';
   if (clean === 'description' || clean === 'popis' || clean === 'informace') return 'description';
   if (clean === 'venue' || clean === 'misto' || clean === 'lokace') return 'venue';
+  if (clean === 'date_option_id' || clean === 'date_option' || clean === 'id_moznosti_terminu') return 'date_option_id';
+  if (clean === 'topic_id' || clean === 'id_tematu') return 'topic_id';
   
   return clean;
 }
