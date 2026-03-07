@@ -47,8 +47,12 @@ export default function Dashboard({ session, profile }) {
     }
 
     async function fetchDateOptions(eventId) {
+        console.log('Fetching date options for event:', eventId);
         const data = await api.getDateOptions(eventId);
-        console.log('Date options fetched:', data);
+        console.log('Date options data received:', data);
+        if (data && data.length > 0) {
+            console.table(data.map(o => ({ id: o.id, label: o.label, votes: o.votes?.length || 0 })));
+        }
         setDateOptions(data || [])
     }
 
@@ -96,16 +100,29 @@ export default function Dashboard({ session, profile }) {
     }
 
     async function toggleDateVote(optionId) {
-        if (votingId) return
+        if (votingId) {
+            console.warn('Voting already in progress for:', votingId);
+            return;
+        }
         setVotingId(optionId)
         try {
+            console.log('--- VOTING START ---');
+            console.log('Action: toggleDateVote', 'OptionId:', optionId, 'UserId:', session.user.id);
             const res = await api.toggleDateVote(optionId, session.user.id);
-            if (res.error) alert(`Nepodařilo se hlasovat o termínu: ${res.error}`)
-            else await fetchDateOptions(event.id)
+            console.log('API Response:', res);
+            if (res.error) {
+                console.error('SERVER RETURNED ERROR:', res.error);
+                alert(`Nepodařilo se hlasovat o termínu: ${res.error}`)
+            } else {
+                console.log('Success! Fetching updated options for event:', event.id);
+                await fetchDateOptions(event.id)
+            }
         } catch (err) {
+            console.error('FETCH EXCEPTION:', err);
             alert(`Chyba sítě: ${err.message}`)
         } finally {
             setVotingId(null)
+            console.log('--- VOTING END ---');
         }
     }
 
