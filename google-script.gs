@@ -11,7 +11,7 @@
  * 7. Copy the Web App URL and put it in your .env file as VITE_API_URL.
  */
 
-const VERSION = "1.0.5";
+const VERSION = "1.0.6";
 
 function doGet(e) {
   try {
@@ -276,24 +276,24 @@ function normalizeHeader(h) {
     .replace(/_+/g, "_") // odstranění duplicitních podtržítek
     .replace(/^_|_$/g, ""); // odstranění podtržítek na začátku/konci
 
-  // Mapování synonym na standardní klíče
-  if (clean === 'text') return 'text'; // Zachovat 'text' jako 'text' (důležité pro témata)
-  
-  const labelMatches = ['termin', 'dat', 'label', 'cas', 'moznost', 'nazev_moznosti', 'kdy', 'info'];
-  if (labelMatches.some(m => clean.includes(m)) && !clean.includes('udalost') && !clean.includes('event')) return 'label';
-  
+  // 1. SPECIFICKÁ ID MAPOVÁNÍ (musí být první!)
+  if (clean === 'date_option_id' || clean === 'date_option' || clean === 'id_moznosti_terminu' || clean === 'option_id' || clean === 'termin_id') return 'date_option_id';
+  if (clean === 'topic_id' || clean === 'id_tematu' || clean === 'tema_id') return 'topic_id';
   if (clean === 'id_udalosti' || clean === 'udalost_id' || clean === 'id_event' || clean === 'event_id') return 'event_id';
-  if (clean === 'autor_id' || clean === 'author_id' || clean === 'vytvoril') return 'author_id';
   if (clean === 'profil_id' || clean === 'profile_id' || clean === 'user_id' || clean === 'uzivatel_id') return 'profile_id';
-  if (clean === 'vytvoreno' || clean === 'created_at' || clean === 'cas_vytvoreni') return 'created_at';
-  if (clean === 'is_active' || clean === 'aktivni' || clean === 'stav') return 'is_active';
-  if (clean === 'is_admin' || clean === 'admin' || clean === 'spravce') return 'is_admin';
+  if (clean === 'autor_id' || clean === 'author_id' || clean === 'vytvoril') return 'author_id';
   if (clean === 'title' || clean === 'nazev' || clean === 'titulek') return 'title';
   if (clean === 'description' || clean === 'popis' || clean === 'informace') return 'description';
   if (clean === 'venue' || clean === 'misto' || clean === 'lokace') return 'venue';
-  if (clean === 'date_option_id' || clean === 'date_option' || clean === 'id_moznosti_terminu' || clean === 'option_id' || clean === 'termin_id') return 'date_option_id';
-  if (clean === 'topic_id' || clean === 'id_tematu' || clean === 'tema_id') return 'topic_id';
-  
+  if (clean === 'vytvoreno' || clean === 'created_at' || clean === 'cas_vytvoreni') return 'created_at';
+  if (clean === 'is_active' || clean === 'aktivni' || clean === 'stav') return 'is_active';
+  if (clean === 'is_admin' || clean === 'admin' || clean === 'spravce') return 'is_admin';
+
+  // 2. OBECNÁ MAPOVÁNÍ PRO POPISKY (jako poslední záchrana)
+  if (clean === 'text') return 'text'; 
+  const labelMatches = ['termin', 'dat', 'label', 'cas', 'moznost', 'nazev_moznosti', 'kdy', 'info'];
+  if (labelMatches.some(m => clean.includes(m))) return 'label';
+
   return clean;
 }
 
