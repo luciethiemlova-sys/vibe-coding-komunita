@@ -195,34 +195,39 @@ export default function Dashboard({ session, profile }) {
                     </h3>
 
                     <div className="space-y-3">
-                        {dateOptions.map(option => (
-                            <button
-                                key={option.id}
-                                onClick={() => toggleDateVote(option.id)}
-                                className={`w-full text-left p-4 rounded-xl border transition-all flex items-center justify-between ${votingId === option.id ? 'opacity-50 pointer-events-none scale-[0.98]' : ''
-                                    } ${option.votes?.some(v => String(v.profile_id).toLowerCase() === String(session.user.id).toLowerCase())
-                                        ? 'bg-pink-600/10 border-pink-500/50 ring-1 ring-pink-500/50'
-                                        : 'bg-slate-900 border-slate-800 hover:border-slate-700'
-                                    }`}
-                            >
-                                <div className="flex items-center gap-3">
-                                    <div className={`w-2 h-2 rounded-full ${option.votes?.some(v => String(v.profile_id).toLowerCase() === String(session.user.id).toLowerCase()) ? 'bg-pink-500' : 'bg-slate-700'}`}></div>
-                                    <span className="font-medium">
-                                        {(() => {
-                                            const label = option.label || option.termin || option.datum || option.text || option.Label || option.Kdy || option.kdy;
-                                            if (label) return label;
-                                            const fallback = Object.entries(option).find(([k, v]) =>
-                                                typeof v === 'string' && v.length > 2 && !['id', 'event_id', 'profile_id'].includes(k.toLowerCase())
-                                            );
-                                            return fallback ? fallback[1] : 'Termín neuveden';
-                                        })()}
-                                    </span>
-                                </div>
-                                <div className="text-xs font-bold text-slate-500">
-                                    {option.votes?.length || 0} hlasů
-                                </div>
-                            </button>
-                        ))}
+                        {dateOptions.map(option => {
+                            const isSelected = option.votes?.some(v => String(v.profile_id).toLowerCase() === String(session.user.id).toLowerCase());
+                            return (
+                                <button
+                                    key={option.id}
+                                    onClick={() => toggleDateVote(option.id)}
+                                    className={`w-full text-left p-4 rounded-xl border transition-all flex items-center justify-between group ${votingId === option.id ? 'opacity-50 pointer-events-none' : ''
+                                        } ${isSelected
+                                            ? 'bg-pink-600/20 border-pink-500 ring-2 ring-pink-500/50 shadow-[0_0_15px_rgba(236,72,153,0.2)]'
+                                            : 'bg-slate-900 border-slate-800 hover:border-pink-500/50 hover:bg-slate-800/50'
+                                        }`}
+                                >
+                                    <div className="flex items-center gap-4">
+                                        <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition-colors ${isSelected ? 'bg-pink-500 border-pink-500' : 'border-slate-700 group-hover:border-pink-500/50'}`}>
+                                            {isSelected && <Plus size={14} className="text-white rotate-45" />}
+                                        </div>
+                                        <span className={`font-semibold text-lg ${isSelected ? 'text-pink-100' : 'text-slate-300'}`}>
+                                            {(() => {
+                                                const label = option.label || option.termin || option.datum || option.text || option.Label || option.Kdy || option.kdy;
+                                                if (label) return label;
+                                                const fallback = Object.entries(option).find(([k, v]) =>
+                                                    typeof v === 'string' && v.length > 2 && !['id', 'event_id', 'profile_id'].includes(k.toLowerCase())
+                                                );
+                                                return fallback ? fallback[1] : 'Termín neuveden';
+                                            })()}
+                                        </span>
+                                    </div>
+                                    <div className={`px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider ${isSelected ? 'bg-pink-500 text-white' : 'bg-slate-800 text-slate-500'}`}>
+                                        {option.votes?.length || 0} hlasů
+                                    </div>
+                                </button>
+                            );
+                        })}
                         {dateOptions.length === 0 && <p className="text-slate-500 text-sm italic py-4">Pro tuto událost nejsou vypsány žádné termíny hlasování.</p>}
                     </div>
                 </section>
