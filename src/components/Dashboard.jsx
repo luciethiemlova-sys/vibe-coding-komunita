@@ -72,12 +72,33 @@ export default function Dashboard({ session, profile }) {
     async function toggleVote(topicId) {
         if (votingId) return
         setVotingId(topicId)
+        // Optimistická aktualizace
+        const oldTopics = [...topics];
+        setTopics(prev => prev.map(t => {
+            if (t.id === topicId) {
+                const votes = t.votes || [];
+                const hasVoted = votes.some(v => String(v.profile_id).toLowerCase() === String(session.user.id).toLowerCase());
+                return {
+                    ...t,
+                    votes: hasVoted
+                        ? votes.filter(v => String(v.profile_id).toLowerCase() !== String(session.user.id).toLowerCase())
+                        : [...votes, { profile_id: session.user.id }]
+                };
+            }
+            return t;
+        }));
+
         try {
             const res = await api.toggleTopicVote(topicId, session.user.id);
-            if (res.error) alert(`Nepodařilo se hlasovat: ${res.error}`)
-            else await fetchTopics(event.id)
+            if (res.error) {
+                setTopics(oldTopics); // Rollback
+                alert(`Nepodařilo se hlasovat: ${res.error}`);
+            } else {
+                await fetchTopics(event.id); // Tichá synchronizace
+            }
         } catch (err) {
-            alert(`Chyba sítě: ${err.message}`)
+            setTopics(oldTopics); // Rollback
+            alert(`Chyba sítě: ${err.message}`);
         } finally {
             setVotingId(null)
         }
@@ -96,14 +117,35 @@ export default function Dashboard({ session, profile }) {
 
     async function toggleDateVote(optionId) {
         if (votingId) return;
-
         setVotingId(optionId)
+
+        // Optimistická aktualizace
+        const oldOptions = [...dateOptions];
+        setDateOptions(prev => prev.map(o => {
+            if (o.id === optionId) {
+                const votes = o.votes || [];
+                const hasVoted = votes.some(v => String(v.profile_id).toLowerCase() === String(session.user.id).toLowerCase());
+                return {
+                    ...o,
+                    votes: hasVoted
+                        ? votes.filter(v => String(v.profile_id).toLowerCase() !== String(session.user.id).toLowerCase())
+                        : [...votes, { profile_id: session.user.id }]
+                };
+            }
+            return o;
+        }));
+
         try {
             const res = await api.toggleDateVote(optionId, session.user.id);
-            if (res.error) alert(`Nepodařilo se hlasovat o termínu: ${res.error}`)
-            else await fetchDateOptions(event.id)
+            if (res.error) {
+                setDateOptions(oldOptions); // Rollback
+                alert(`Nepodařilo se hlasovat o termínu: ${res.error}`);
+            } else {
+                await fetchDateOptions(event.id); // Tichá synchronizace
+            }
         } catch (err) {
-            alert(`Chyba sítě: ${err.message}`)
+            setDateOptions(oldOptions); // Rollback
+            alert(`Chyba sítě: ${err.message}`);
         } finally {
             setVotingId(null)
         }

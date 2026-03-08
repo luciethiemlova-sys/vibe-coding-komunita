@@ -170,21 +170,8 @@ function doPost(e) {
       const optionIdIdx = headers.indexOf('date_option_id');
       const profileIdIdx = headers.indexOf('profile_id');
       
-      const debugInfo = {
-        action: 'toggledatevote',
-        headersFound: headers,
-        optionIdIdx,
-        profileIdIdx,
-        receivedOptionId: data.optionId,
-        receivedProfileId: data.profileId,
-        rowCount: votesRows.length
-      };
-
       if (optionIdIdx === -1 || profileIdIdx === -1) {
-        return jsonResponse({ 
-          error: 'Required columns not found in date_votes', 
-          debug: debugInfo 
-        });
+        return jsonResponse({ error: 'Required columns not found in date_votes' });
       }
       
       const existingRowIndex = votesRows.findIndex((row, idx) => 
@@ -193,18 +180,15 @@ function doPost(e) {
         String(row[profileIdIdx]).toLowerCase() === String(data.profileId).toLowerCase()
       );
       
-      let resAction = "";
       if (existingRowIndex > -1) {
         sheet.deleteRow(existingRowIndex + 1);
-        resAction = "deleted";
       } else {
         const newRow = new Array(headers.length).fill("");
         newRow[optionIdIdx] = data.optionId;
         newRow[profileIdIdx] = data.profileId;
         sheet.appendRow(newRow);
-        resAction = "added";
       }
-      return jsonResponse({ success: true, action: resAction, debug: debugInfo });
+      return jsonResponse({ success: true });
     }
 
     if (action === 'saveprofile') {
