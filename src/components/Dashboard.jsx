@@ -47,12 +47,7 @@ export default function Dashboard({ session, profile }) {
     }
 
     async function fetchDateOptions(eventId) {
-        console.log('Fetching date options for event:', eventId);
         const data = await api.getDateOptions(eventId);
-        console.log('Date options data received:', data);
-        if (data && data.length > 0) {
-            console.table(data.map(o => ({ id: o.id, label: o.label, votes: o.votes?.length || 0 })));
-        }
         setDateOptions(data || [])
     }
 
@@ -141,7 +136,6 @@ export default function Dashboard({ session, profile }) {
                         </div>
                     </div>
                 </div>
-                <p>Kód verze: <span style={{ color: '#fff', fontWeight: 'bold' }}>1.0.9-CACHEBUST</span></p>
                 <div className="absolute top-0 right-0 w-64 h-64 bg-purple-600/10 blur-[100px] -mr-32 -mt-32"></div>
             </section>
 
