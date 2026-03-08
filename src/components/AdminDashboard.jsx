@@ -307,7 +307,13 @@ export default function AdminDashboard({ onBack }) {
                                         {eventDetails.dates.map(opt => (
                                             <div key={opt.id} className="bg-slate-900 border border-slate-800 p-4 rounded-xl">
                                                 <div className="flex justify-between items-center mb-3">
-                                                    <span className="font-bold text-slate-200">{opt.label}</span>
+                                                    <span className="font-bold text-slate-200">
+                                                        {(() => {
+                                                            const val = opt.label || opt.text || 'Termín';
+                                                            const d = new Date(val);
+                                                            return isNaN(d.getTime()) ? val : d.toLocaleString('cs-CZ', { weekday: 'long', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' });
+                                                        })()}
+                                                    </span>
                                                     <span className="bg-pink-500/20 text-pink-400 px-2 py-0.5 rounded text-xs font-black">{opt.votes?.length || 0} HLASŮ</span>
                                                 </div>
                                                 <div className="flex flex-wrap gap-2">
