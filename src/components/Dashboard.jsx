@@ -104,18 +104,20 @@ export default function Dashboard({ session, profile }) {
 
         setVotingId(optionId)
         try {
-            console.log('Sending vote for:', optionId);
             const res = await api.toggleDateVote(optionId, session.user.id);
-            alert(`Odpověď serveru: ${JSON.stringify(res)}`);
-
             if (res.error) {
-                console.error('SERVER ERROR:', res.error);
-                alert(`CHYBA: ${res.error}`);
+                alert(`CHYBA SERVERU: ${res.error}`);
             } else {
-                await fetchDateOptions(event.id);
+                // Po úspěšném hlasování zkusíme ihned načíst data
+                const updatedData = await api.getDateOptions(event.id);
+                const currentOption = updatedData?.find(o => o.id === optionId);
+                const votesCount = currentOption?.votes?.length || 0;
+
+                alert(`ODPOVĚĎ: ${JSON.stringify(res)}\nPOČET HLASŮ ZE SERVERU: ${votesCount}\n\nPokud se tlačítko nezměnilo, pak server hlas neuložil, nebo ho vrací špatně.`);
+
+                setDateOptions(updatedData || []);
             }
         } catch (err) {
-            console.error('NETWORK ERROR:', err);
             alert(`CHYBA SÍTĚ: ${err.message}`);
         } finally {
             setVotingId(null)
@@ -139,6 +141,7 @@ export default function Dashboard({ session, profile }) {
                         </div>
                     </div>
                 </div>
+                <p>Kód verze: <span style={{ color: '#fff', fontWeight: 'bold' }}>1.0.9-CACHEBUST</span></p>
                 <div className="absolute top-0 right-0 w-64 h-64 bg-purple-600/10 blur-[100px] -mr-32 -mt-32"></div>
             </section>
 

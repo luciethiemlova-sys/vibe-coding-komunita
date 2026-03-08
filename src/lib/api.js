@@ -8,7 +8,7 @@ async function request(action, data = {}, method = 'GET') {
 
     try {
         if (method === 'GET') {
-            const params = new URLSearchParams({ action, ...data });
+            const params = new URLSearchParams({ action, ...data, _t: Date.now() });
             const response = await fetch(`${API_URL}?${params.toString()}`);
             return await response.json();
         } else {
