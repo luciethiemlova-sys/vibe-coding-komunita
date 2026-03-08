@@ -100,20 +100,10 @@ export default function Dashboard({ session, profile }) {
         setVotingId(optionId)
         try {
             const res = await api.toggleDateVote(optionId, session.user.id);
-            if (res.error) {
-                alert(`CHYBA SERVERU: ${res.error}`);
-            } else {
-                // Po úspěšném hlasování zkusíme ihned načíst data
-                const updatedData = await api.getDateOptions(event.id);
-                const currentOption = updatedData?.find(o => o.id === optionId);
-                const votesCount = currentOption?.votes?.length || 0;
-
-                alert(`ODPOVĚĎ: ${JSON.stringify(res)}\nPOČET HLASŮ ZE SERVERU: ${votesCount}\n\nPokud se tlačítko nezměnilo, pak server hlas neuložil, nebo ho vrací špatně.`);
-
-                setDateOptions(updatedData || []);
-            }
+            if (res.error) alert(`Nepodařilo se hlasovat o termínu: ${res.error}`)
+            else await fetchDateOptions(event.id)
         } catch (err) {
-            alert(`CHYBA SÍTĚ: ${err.message}`);
+            alert(`Chyba sítě: ${err.message}`)
         } finally {
             setVotingId(null)
         }
