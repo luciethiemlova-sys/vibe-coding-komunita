@@ -22,23 +22,33 @@ export default function AdminDashboard({ onBack }) {
     async function fetchData() {
         setLoading(true)
         try {
-            if (view === 'events') {
-                const data = await api.getEvents();
-                setEvents(data || [])
-            } else {
-                const data = await api.getMembers();
-                setMembers(data || [])
-            }
+            // VŽDY načteme události i členy, abychom měli data pro výsledky
+            const [eventsData, membersData] = await Promise.all([
+                api.getEvents(),
+                api.getMembers()
+            ]);
+
+            const allEvents = eventsData || [];
+            const allMembers = membersData || [];
+
+            setEvents(allEvents);
+            setMembers(allMembers);
 
             // Fetch details for the active event to show results
-            const allEvents = view === 'events' ? events : await api.getEvents();
-            const activeEvent = allEvents.find(e => e.is_active);
+            // Robustnější kontrola is_active (zvládne true i "TRUE")
+            const activeEvent = allEvents.find(e =>
+                e.is_active === true ||
+                String(e.is_active).toLowerCase() === 'true'
+            );
+
             if (activeEvent) {
                 const [topics, dates] = await Promise.all([
                     api.getTopics(activeEvent.id),
                     api.getDateOptions(activeEvent.id)
                 ]);
                 setEventDetails({ topics: topics || [], dates: dates || [] });
+            } else {
+                setEventDetails({ topics: [], dates: [] });
             }
         } catch (err) {
             console.error('Error fetching admin data:', err);

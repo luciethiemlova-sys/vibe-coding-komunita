@@ -70,8 +70,6 @@ export default function Dashboard({ session, profile }) {
     const [votingId, setVotingId] = useState(null)
 
     async function toggleVote(topicId) {
-        if (votingId) return
-        setVotingId(topicId)
         // Optimistická aktualizace
         const oldTopics = [...topics];
         setTopics(prev => prev.map(t => {
@@ -99,8 +97,6 @@ export default function Dashboard({ session, profile }) {
         } catch (err) {
             setTopics(oldTopics); // Rollback
             alert(`Chyba sítě: ${err.message}`);
-        } finally {
-            setVotingId(null)
         }
     }
 
@@ -116,10 +112,7 @@ export default function Dashboard({ session, profile }) {
     }
 
     async function toggleDateVote(optionId) {
-        if (votingId) return;
-        setVotingId(optionId)
-
-        // Optimistická aktualizace
+        // Optimistická aktualizace - OKAMŽITÁ ZMĚNA BEZ BLOKOVÁNÍ
         const oldOptions = [...dateOptions];
         setDateOptions(prev => prev.map(o => {
             if (o.id === optionId) {
@@ -146,8 +139,6 @@ export default function Dashboard({ session, profile }) {
         } catch (err) {
             setDateOptions(oldOptions); // Rollback
             alert(`Chyba sítě: ${err.message}`);
-        } finally {
-            setVotingId(null)
         }
     }
 
@@ -198,7 +189,7 @@ export default function Dashboard({ session, profile }) {
                         {topics.map(topic => (
                             <div
                                 key={topic.id}
-                                className={`bg-slate-900 border border-slate-800 p-4 rounded-xl flex items-start justify-between gap-4 transition-opacity ${votingId === topic.id ? 'opacity-50 pointer-events-none' : ''}`}
+                                className={`bg-slate-900 border border-slate-800 p-4 rounded-xl flex items-start justify-between gap-4 transition-opacity`}
                             >
                                 <div>
                                     <p className="text-white font-medium mb-1">{topic.text || topic.label || 'Bez textu'}</p>
@@ -243,10 +234,9 @@ export default function Dashboard({ session, profile }) {
                                 <button
                                     key={option.id}
                                     onClick={() => toggleDateVote(option.id)}
-                                    className={`w-full text-left p-4 rounded-xl border transition-all flex items-center justify-between group ${votingId === option.id ? 'opacity-50 pointer-events-none' : ''
-                                        } ${isSelected
-                                            ? 'bg-pink-600/20 border-pink-500 ring-2 ring-pink-500/50 shadow-[0_0_15px_rgba(236,72,153,0.2)]'
-                                            : 'bg-slate-900 border-slate-800 hover:border-pink-500/50 hover:bg-slate-800/50'
+                                    className={`w-full text-left p-4 rounded-xl border transition-all flex items-center justify-between group ${isSelected
+                                        ? 'bg-pink-600/20 border-pink-500 ring-2 ring-pink-500/50 shadow-[0_0_15px_rgba(236,72,153,0.2)]'
+                                        : 'bg-slate-900 border-slate-800 hover:border-pink-500/50 hover:bg-slate-800/50'
                                         }`}
                                 >
                                     <div className="flex items-center gap-4">
