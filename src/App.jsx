@@ -132,7 +132,7 @@ function App() {
                     <Dashboard session={session} profile={profile} />
                 </main>
             </div>
-            {profile?.is_admin && <DebugInfo session={session} profile={profile} loading={loading} />}
+            {profile?.is_admin === true && <DebugInfo session={session} profile={profile} loading={loading} />}
         </div>
     )
 }

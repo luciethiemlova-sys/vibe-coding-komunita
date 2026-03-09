@@ -3,6 +3,8 @@ import React from 'react'
 export default function DebugInfo({ session, profile, loading }) {
     const apiUrl = import.meta.env.VITE_API_URL;
 
+    if (!profile?.is_admin) return null;
+
     return (
         <div style={{
             position: 'fixed',
@@ -24,7 +26,7 @@ export default function DebugInfo({ session, profile, loading }) {
                 <p>Uživatel: {session ? 'Přihlášen' : 'Anonym'}</p>
                 <p>Profil: {profile ? 'Nalezen' : 'Chybí'}</p>
                 <p>Backend: {apiUrl ? 'URL OK' : '!! CHYBÍ URL !!'}</p>
-                <p>Kód verze: <span style={{ color: '#fff' }}>1.0.7</span></p>
+                <p>Kód verze: <span style={{ color: '#fff' }}>1.0.8</span></p>
                 {profile && <p>Role: {profile.is_admin ? 'ADMIN' : 'MEMBER'}</p>}
                 {profile && <p>ID: {String(profile.id).substring(0, 10)}...</p>}
             </div>
