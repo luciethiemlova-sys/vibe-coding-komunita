@@ -77,7 +77,9 @@ function App() {
         )
     }
 
-    if (showAdmin && profile?.is_admin) {
+    const isAdmin = profile?.is_admin === true || String(profile?.is_admin).toLowerCase() === 'true';
+
+    if (showAdmin && isAdmin) {
         return <AdminDashboard onBack={() => setShowAdmin(false)} />
     }
 
@@ -89,7 +91,7 @@ function App() {
                         <h1 className="text-3xl font-black tracking-tighter bg-gradient-to-r from-purple-400 to-pink-600 bg-clip-text text-transparent">
                             Vibe Coding Ostrava
                         </h1>
-                        {profile?.is_admin && (
+                        {isAdmin && (
                             <button
                                 onClick={() => setShowAdmin(true)}
                                 className="px-3 py-1 bg-purple-600/20 border border-purple-500/50 rounded-full text-[10px] font-black uppercase tracking-wider text-purple-400 hover:bg-purple-600 hover:text-white transition-all shadow-[0_0_15px_rgba(147,51,234,0.3)]"
@@ -109,7 +111,7 @@ function App() {
                     <Dashboard session={session} profile={profile} />
                 </main>
             </div>
-            <DebugInfo session={session} profile={profile} loading={loading} />
+            {isAdmin && <DebugInfo session={session} profile={profile} loading={loading} />}
         </div>
     )
 }
