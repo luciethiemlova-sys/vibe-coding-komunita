@@ -4,6 +4,7 @@ import Auth from './components/Auth'
 import Account from './components/Account'
 import Dashboard from './components/Dashboard'
 import AdminDashboard from './components/AdminDashboard'
+import UserProfile from './components/UserProfile'
 import DebugInfo from './components/DebugInfo'
 
 import './index.css'
@@ -19,6 +20,7 @@ function App() {
     })
     const [loading, setLoading] = useState(!session)
     const [showAdmin, setShowAdmin] = useState(false)
+    const [showProfile, setShowProfile] = useState(false)
 
     useEffect(() => {
         if (session && !profile) {
@@ -81,10 +83,23 @@ function App() {
         return <AdminDashboard onBack={() => setShowAdmin(false)} />
     }
 
+    if (showProfile) {
+        return (
+            <div className="min-h-screen bg-slate-950 text-white p-8 flex items-center justify-center">
+                <UserProfile
+                    session={session}
+                    profile={profile}
+                    onUpdate={(p) => setProfile(p)}
+                    onCancel={() => setShowProfile(false)}
+                />
+            </div>
+        )
+    }
+
     return (
         <div className="min-h-screen bg-slate-950 text-white p-8">
             <div className="max-w-4xl mx-auto">
-                <header className="flex justify-between items-center mb-12">
+                <header className="flex justify-between items-center mb-12 flex-wrap gap-4">
                     <div className="flex items-center gap-6">
                         <h1 className="text-3xl font-black tracking-tighter bg-gradient-to-r from-purple-400 to-pink-600 bg-clip-text text-transparent">
                             Vibe Coding Ostrava
@@ -98,18 +113,26 @@ function App() {
                             </button>
                         )}
                     </div>
-                    <button
-                        onClick={handleLogout}
-                        className="px-4 py-2 text-sm font-medium text-slate-400 hover:text-white transition-colors"
-                    >
-                        Odhlásit se
-                    </button>
+                    <div className="flex items-center gap-2 sm:gap-4">
+                        <button
+                            onClick={() => setShowProfile(true)}
+                            className="px-4 py-2 text-sm font-medium bg-slate-800 text-slate-300 hover:text-white hover:bg-slate-700 rounded-lg transition-all"
+                        >
+                            Můj profil
+                        </button>
+                        <button
+                            onClick={handleLogout}
+                            className="px-4 py-2 text-sm font-medium text-slate-400 hover:text-white transition-colors"
+                        >
+                            Odhlásit se
+                        </button>
+                    </div>
                 </header>
                 <main>
                     <Dashboard session={session} profile={profile} />
                 </main>
             </div>
-            <DebugInfo session={session} profile={profile} loading={loading} />
+            {profile?.is_admin && <DebugInfo session={session} profile={profile} loading={loading} />}
         </div>
     )
 }
