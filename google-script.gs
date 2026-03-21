@@ -11,12 +11,15 @@
  * 7. Copy the Web App URL and put it in your .env file as VITE_API_URL.
  */
 
-const VERSION = "1.1.0";
+const VERSION = "1.1.1";
+
+// ⚠️ SEM DO UVOZOVEK VLOŽ CELOU ADRESU TVÉ GOOGLE TABULKY!
+const SHEET_URL = "VLOZ_SEM_CELOU_ADRESU_TVE_TABULKY";
 
 function doGet(e) {
   try {
     const action = String(e.parameter.action || "").trim().toLowerCase();
-    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const ss = SpreadsheetApp.openByUrl(SHEET_URL);
     
     // DIAGNOSTIKA - uvidíme přesně, co je v tabulce
     if (action === 'diagnostics') {
@@ -32,6 +35,11 @@ function doGet(e) {
         }
       });
       return jsonResponse({ version: VERSION, sheets, headers, sampleRow: sheetData, status: 'OK' });
+    }
+
+    const getSheet = (name) => {
+      if (name === 'profiles') return ss.getSheetByName('profiles') || ss.getSheetByName('profile') || ss.getSheetByName('uzivatele');
+      return ss.getSheetByName(name);
     }
 
     if (action === 'getevent') {
@@ -62,7 +70,8 @@ function doGet(e) {
 
     if (action === 'gettopics') {
       const eventId = e.parameter.eventId;
-      const topics = getSheetData('topics').filter(t => String(t.event_id || t.Event_Id) === String(eventId));
+      const topicsData = getSheetData('topics');
+      const topics = Array.isArray(topicsData) ? topicsData.filter(t => String(t.event_id || t.Event_Id) === String(eventId)) : [];
       const profiles = getSheetData('profiles');
       const votes = getSheetData('topic_votes');
       
@@ -109,7 +118,7 @@ function doPost(e) {
   try {
     const data = JSON.parse(e.postData.contents);
     const action = String(data.action || "").trim().toLowerCase();
-    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const ss = SpreadsheetApp.openByUrl(SHEET_URL);
 
     if (action === 'sendmagiclink') {
       const email = String(data.email).toLowerCase().trim();
@@ -272,15 +281,31 @@ function doPost(e) {
     }
 
     if (action === 'saveprofile') {
-      const sheet = ss.getSheetByName('profiles');
+      let sheet = ss.getSheetByName('profiles') || ss.getSheetByName('profile');
+      if (!sheet) return jsonResponse({ error: 'Sheet "profiles" or "profile" not found' });
+      
       const dataRows = sheet.getDataRange().getValues();
-      const headers = dataRows[0].map(h => String(h).toLowerCase().trim());
-      const idIndex = headers.indexOf('id');
-      const rowIndex = dataRows.findIndex((row, idx) => idx > 0 && String(row[idIndex]).toLowerCase() === String(data.id).toLowerCase());
+      const headers = dataRows[0].map(h => normalizeHeader(h));
+      
+      // Find the ID column (id, profile_id, email, etc.)
+      const idIdx = headers.indexOf('id');
+      if (idIdx === -1) return jsonResponse({ error: 'ID column not found in profile sheet' });
+      
+      const rowIndex = dataRows.findIndex((row, idx) => idx > 0 && String(row[idIdx]).toLowerCase() === String(data.id).toLowerCase());
       
       if (rowIndex > -1) {
-        sheet.getRange(rowIndex + 1, headers.indexOf('name') + 1).setValue(data.name);
-        sheet.getRange(rowIndex + 1, headers.indexOf('bio') + 1).setValue(data.bio);
+        const row = rowIndex + 1;
+        const setVal = (key, val) => {
+          const colIdx = headers.indexOf(key);
+          if (colIdx > -1) sheet.getRange(row, colIdx + 1).setValue(val || "");
+        };
+        
+        setVal('name', data.name);
+        setVal('bio', data.bio);
+        setVal('phone', data.phone);
+        setVal('photo', data.photo);
+      } else {
+        return jsonResponse({ error: 'User profile not found: ' + data.id });
       }
       return jsonResponse({ success: true });
     }
@@ -373,10 +398,13 @@ function normalizeHeader(h) {
     .replace(/^_|_$/g, ""); // odstranění podtržítek na začátku/konci
 
   // 1. SPECIFICKÁ ID MAPOVÁNÍ (musí být první!)
+  if (clean === 'id' || clean === 'email' || clean === 'user_id' || clean === 'uzivatel_id' || clean === 'id_uzivatele' || clean === 'id_clena' || clean === 'member_id') return 'id';
+  if (clean === 'name' || clean === 'jmeno' || clean === 'prijmeni' || clean === 'cele_jmeno') return 'name';
+  if (clean === 'bio' || clean === 'popis' || clean === 'o_mne') return 'bio';
   if (clean === 'date_option_id' || clean === 'date_option' || clean === 'id_moznosti_terminu' || clean === 'option_id' || clean === 'termin_id' || clean === 'id_terminu') return 'date_option_id';
   if (clean === 'topic_id' || clean === 'id_tematu' || clean === 'tema_id') return 'topic_id';
   if (clean === 'id_udalosti' || clean === 'udalost_id' || clean === 'id_event' || clean === 'event_id') return 'event_id';
-  if (clean === 'profil_id' || clean === 'profile_id' || clean === 'user_id' || clean === 'uzivatel_id' || clean === 'id_uzivatele') return 'profile_id';
+  if (clean === 'profil_id' || clean === 'profile_id') return 'profile_id';
   if (clean === 'autor_id' || clean === 'author_id' || clean === 'vytvoril') return 'author_id';
   if (clean === 'title' || clean === 'nazev' || clean === 'titulek') return 'title';
   if (clean === 'description' || clean === 'popis' || clean === 'informace') return 'description';
@@ -385,6 +413,8 @@ function normalizeHeader(h) {
   if (clean === 'is_active' || clean === 'aktivni' || clean === 'stav') return 'is_active';
   if (clean === 'is_admin' || clean === 'admin' || clean === 'spravce') return 'is_admin';
   if (clean === 'vote_type' || clean === 'typ_hlasu' || clean === 'hlas') return 'vote_type';
+  if (clean === 'phone' || clean === 'telefon' || clean === 'tel' || clean === 'cislo' || clean === 'mobil') return 'phone';
+  if (clean === 'photo' || clean === 'fotka' || clean === 'avatar' || clean === 'obrazek') return 'photo';
 
   // 2. OBECNÁ MAPOVÁNÍ PRO POPISKY (jako poslední záchrana)
   if (clean === 'text') return 'text'; 
@@ -395,7 +425,10 @@ function normalizeHeader(h) {
 }
 
 function getSheetData(name) {
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(name);
+  const ss = SpreadsheetApp.openByUrl(SHEET_URL);
+  let sheet = ss.getSheetByName(name);
+  if (!sheet && name === 'profiles') sheet = ss.getSheetByName('profile') || ss.getSheetByName('uzivatele');
+  
   if (!sheet) return [];
   const data = sheet.getDataRange().getValues();
   if (data.length <= 1) return [];
