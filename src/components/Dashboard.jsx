@@ -225,7 +225,7 @@ export default function Dashboard({ session, profile }) {
                         <div className="text-center py-8 text-slate-400">Načítám uživatele...</div>
                     ) : (
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                            {members.map(member => (
+                            {Array.isArray(members) && members.map(member => (
                                 <div key={member.id} className="bg-slate-800 p-5 rounded-xl flex flex-col justify-between border border-slate-700 hover:border-purple-500/50 transition-all group shadow-lg">
                                     <div className="mb-4">
                                         <div className="flex items-start gap-4 mb-4">
@@ -313,8 +313,10 @@ export default function Dashboard({ session, profile }) {
                                     <Calendar size={20} className="text-pink-400" /> Termíny a Hlasování
                                 </h3>
                                 <div className="space-y-3 max-w-2xl">
-                                    {dateOptions.map(option => {
-                                        const isSelected = option.votes?.some(v => String(v.profile_id).toLowerCase() === String(session.user.id).toLowerCase());
+                                    {Array.isArray(dateOptions) && dateOptions.map(option => {
+                                        const isSelected = Array.isArray(option.votes) && option.votes.some(v => 
+                                            String(v.profile_id || v.id || "").toLowerCase() === String(session?.user?.id || "").toLowerCase()
+                                        );
                                         return (
                                             <button
                                                 key={option.id}
