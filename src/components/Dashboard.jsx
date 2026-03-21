@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { api } from '../lib/api'
+import { getAvatarById } from '../lib/avatars'
 import { ThumbsUp, ThumbsDown, Plus, Calendar, MapPin, Trash2, UsersIcon, LayoutGrid, MessageSquare } from 'lucide-react'
 
 export default function Dashboard({ session, profile }) {
@@ -51,18 +52,21 @@ export default function Dashboard({ session, profile }) {
 
     async function fetchTopics(eventId) {
         const data = await api.getTopics(eventId);
-        setTopics(data || [])
+        if (Array.isArray(data)) setTopics(data);
+        else setTopics([]);
     }
 
     async function fetchDateOptions(eventId) {
         const data = await api.getDateOptions(eventId);
-        setDateOptions(data || [])
+        if (Array.isArray(data)) setDateOptions(data);
+        else setDateOptions([]);
     }
 
     async function fetchMembers() {
         setLoadingMembers(true)
         const data = await api.getMembers()
-        setMembers(data || [])
+        if (Array.isArray(data)) setMembers(data);
+        else setMembers([]);
         setLoadingMembers(false)
     }
 
@@ -89,18 +93,25 @@ export default function Dashboard({ session, profile }) {
         setTopics(prev => prev.map(t => {
             if (t.id === topicId) {
                 const votes = t.votes || [];
-                const existingVote = votes.find(v => String(v.profile_id).toLowerCase() === String(session.user.id).toLowerCase());
+                const existingVote = votes.find(v => 
+                    String(v.profile_id || v.id || "").toLowerCase() === String(session?.user?.id || "").toLowerCase()
+                );
                 
                 let newVotes;
                 if (existingVote) {
                     const currentVoteType = parseInt(existingVote.vote_type) || 1;
                     if (currentVoteType === voteType) {
-                        newVotes = votes.filter(v => String(v.profile_id).toLowerCase() !== String(session.user.id).toLowerCase());
+                        newVotes = votes.filter(v => 
+                            String(v.profile_id || v.id || "").toLowerCase() !== String(session?.user?.id || "").toLowerCase()
+                        );
                     } else {
-                        newVotes = votes.map(v => String(v.profile_id).toLowerCase() === String(session.user.id).toLowerCase() ? { ...v, vote_type: voteType } : v);
+                        newVotes = votes.map(v => 
+                            String(v.profile_id || v.id || "").toLowerCase() === String(session?.user?.id || "").toLowerCase() 
+                            ? { ...v, vote_type: voteType } : v
+                        );
                     }
                 } else {
-                    newVotes = [...votes, { profile_id: session.user.id, vote_type: voteType }];
+                    newVotes = [...votes, { profile_id: session?.user?.id, vote_type: voteType }];
                 }
                 return { ...t, votes: newVotes };
             }
@@ -109,7 +120,7 @@ export default function Dashboard({ session, profile }) {
 
         try {
             const res = await api.toggleTopicVote(topicId, session.user.id, voteType);
-            if (res.error) {
+            if (res?.error) {
                 setTopics(oldTopics); 
                 alert(`Nepodařilo se hlasovat: ${res.error}`);
             } else {
@@ -215,25 +226,59 @@ export default function Dashboard({ session, profile }) {
                     ) : (
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                             {members.map(member => (
-                                <div key={member.id} className="bg-slate-800 p-4 rounded-xl flex flex-col justify-between border border-slate-700 hover:border-purple-500/50 transition-colors">
+                                <div key={member.id} className="bg-slate-800 p-5 rounded-xl flex flex-col justify-between border border-slate-700 hover:border-purple-500/50 transition-all group shadow-lg">
                                     <div className="mb-4">
-                                        <div className="flex items-center justify-between">
-                                            <h3 className="font-bold text-lg text-white">{member.name || 'Anonym'}</h3>
-                                            {(String(member.is_admin).toLowerCase() === 'true' || member.is_admin === true) && (
-                                                <span className="text-[10px] uppercase font-black tracking-wider bg-purple-500/20 text-purple-400 px-2 py-0.5 rounded text-center">Admin</span>
-                                            )}
+                                        <div className="flex items-start gap-4 mb-4">
+                                            {(() => {
+                                                const avatar = getAvatarById(member.photo);
+                                                if (avatar) {
+                                                    return (
+                                                        <div className="w-14 h-14 rounded-full bg-slate-900 border-2 border-slate-700 flex items-center justify-center text-3xl shadow-inner">
+                                                            {avatar.char}
+                                                        </div>
+                                                    );
+                                                }
+                                                return (
+                                                    <div className="w-14 h-14 rounded-full bg-slate-900 border-2 border-slate-700 flex items-center justify-center text-xl font-bold text-slate-500 shadow-inner">
+                                                        {member.name?.substring(0, 1) || '?'}
+                                                    </div>
+                                                );
+                                            })()}
+                                            <div className="flex-1 min-w-0">
+                                                <div className="flex items-center gap-2 mb-0.5">
+                                                    <h3 className="font-bold text-lg text-white truncate">{member.name || 'Anonym'}</h3>
+                                                    {(String(member.is_admin).toLowerCase() === 'true' || member.is_admin === true) && (
+                                                        <span className="shrink-0 text-[8px] uppercase font-black tracking-wider bg-purple-500/20 text-purple-400 px-1.5 py-0.5 rounded border border-purple-500/30">Admin</span>
+                                                    )}
+                                                </div>
+                                                <p className="text-[10px] text-slate-500 truncate font-mono">{member.id}</p>
+                                                {member.phone && (
+                                                    <p className="text-xs text-slate-400 mt-1 flex items-center gap-1.5">
+                                                        <span className="text-purple-500">📞</span> {member.phone}
+                                                    </p>
+                                                )}
+                                            </div>
                                         </div>
-                                        <p className="text-xs text-slate-400 mt-1">{member.id}</p>
-                                        {member.bio && <p className="text-sm text-slate-300 mt-3 line-clamp-3">{member.bio}</p>}
+                                        {member.bio && (
+                                            <div className="bg-slate-900/50 p-3 rounded-lg border border-slate-700/50">
+                                                <p className="text-sm text-slate-300 leading-relaxed italic line-clamp-3">"{member.bio}"</p>
+                                            </div>
+                                        )}
                                     </div>
-                                    {profile?.is_admin && String(member.id).toLowerCase() !== String(session.user.id).toLowerCase() && (
-                                        <button 
-                                            onClick={() => handleDeleteMember(member.id)}
-                                            className="text-red-400 hover:text-red-300 hover:bg-red-400/10 px-3 py-1.5 flex items-center gap-2 rounded-lg text-xs font-bold transition-colors w-fit"
-                                        >
-                                            <Trash2 size={14} /> Smazat uživatele
-                                        </button>
-                                    )}
+                                    <div className="flex items-center justify-between mt-auto pt-4 border-t border-slate-700/50">
+                                        <span className="text-[10px] text-slate-600 uppercase font-bold tracking-widest">
+                                            Vibe Member
+                                        </span>
+                                        {profile?.is_admin && String(member.id).toLowerCase() !== String(session.user.id).toLowerCase() && (
+                                            <button 
+                                                onClick={() => handleDeleteMember(member.id)}
+                                                className="text-slate-500 hover:text-red-400 transition-colors"
+                                                title="Smazat uživatele"
+                                            >
+                                                <Trash2 size={16} />
+                                            </button>
+                                        )}
+                                    </div>
                                 </div>
                             ))}
                             {members.length === 0 && <p className="text-slate-500">Žádní uživatelé nenalezeni.</p>}
@@ -338,14 +383,20 @@ export default function Dashboard({ session, profile }) {
                             </form>
 
                             <div className="space-y-4">
-                                {topics.length === 0 && <p className="text-slate-500 text-sm py-8 text-center bg-slate-800/50 rounded-xl border border-slate-800 border-dashed">Zatím žádná témata. Buď první, kdo nějaké přidá!</p>}
+                                {topics.length === 0 && (
+                                    <p className="text-slate-500 text-sm py-8 text-center bg-slate-800/50 rounded-xl border border-slate-800 border-dashed">
+                                        Zatím žádná témata. Buď první, kdo nějaké přidá!
+                                    </p>
+                                )}
                                 {topics.sort((a,b) => {
                                     const aScore = (a.votes||[]).reduce((acc, v) => acc + (parseInt(v.vote_type)||1), 0);
                                     const bScore = (b.votes||[]).reduce((acc, v) => acc + (parseInt(v.vote_type)||1), 0);
                                     return bScore - aScore;
                                 }).map(topic => {
                                     const topicVotes = topic.votes || [];
-                                    const myVote = topicVotes.find(v => String(v.profile_id).toLowerCase() === String(session.user.id).toLowerCase());
+                                    const myVote = topicVotes.find(v => 
+                                        String(v.profile_id || v.id || "").toLowerCase() === String(session?.user?.id || "").toLowerCase()
+                                    );
                                     const myVoteType = myVote ? (parseInt(myVote.vote_type) || 1) : 0;
                                     
                                     const upvotes = topicVotes.filter(v => (parseInt(v.vote_type) || 1) > 0).length;

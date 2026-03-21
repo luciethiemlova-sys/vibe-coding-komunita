@@ -64,7 +64,7 @@ export const api = {
     addTopic: (eventId, text, authorId) => postRequest('addTopic', { eventId, text, authorId }),
     toggleTopicVote: (topicId, profileId, voteType = 1) => postRequest('toggletopicvote', { topicId, profileId, voteType }),
     toggleDateVote: (optionId, profileId) => postRequest('toggleDateVote', { optionId, profileId }),
-    saveProfile: (id, name, bio) => postRequest('saveProfile', { id, name, bio }),
+    saveProfile: (id, name, bio, phone, photo) => postRequest('saveProfile', { id, name, bio, phone, photo }),
     getEvents: () => request('getEvents'),
     createEvent: (eventData) => postRequest('createEvent', eventData),
     updateEvent: (id, eventData) => postRequest('saveevent', { id, ...eventData }),
