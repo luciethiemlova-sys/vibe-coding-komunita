@@ -388,7 +388,7 @@ export default function Dashboard({ session, profile }) {
                                         Zatím žádná témata. Buď první, kdo nějaké přidá!
                                     </p>
                                 )}
-                                {topics.sort((a,b) => {
+                                {Array.isArray(topics) && [...topics].sort((a,b) => {
                                     const aScore = (a.votes||[]).reduce((acc, v) => acc + (parseInt(v.vote_type)||1), 0);
                                     const bScore = (b.votes||[]).reduce((acc, v) => acc + (parseInt(v.vote_type)||1), 0);
                                     return bScore - aScore;
