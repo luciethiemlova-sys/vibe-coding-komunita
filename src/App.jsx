@@ -20,6 +20,7 @@ function App() {
     })
     const [loading, setLoading] = useState(!session)
     const [showAdmin, setShowAdmin] = useState(false)
+    const [showProfile, setShowProfile] = useState(false)
 
     useEffect(() => {
         const params = new URLSearchParams(window.location.search);
@@ -100,7 +101,7 @@ function App() {
 
     const isAdmin = profile?.is_admin === true || String(profile?.is_admin).toLowerCase() === 'true';
 
-    const [showProfile, setShowProfile] = useState(false)
+
 
     if (showProfile) {
         return (
