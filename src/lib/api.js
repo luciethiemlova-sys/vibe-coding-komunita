@@ -55,17 +55,20 @@ async function postRequest(action, data = {}) {
 
 export const api = {
     login: (email) => postRequest('login', { email }),
+    sendMagicLink: (email, appUrl) => postRequest('sendmagiclink', { email, appUrl }),
+    verifyToken: (token) => postRequest('verifytoken', { token }),
     getEvent: () => request('getEvent'),
     getTopics: (eventId) => request('getTopics', { eventId }),
     deleteTopic: (topicId) => postRequest('deletetopic', { topicId }),
     getDateOptions: (eventId) => request('getDateOptions', { eventId }),
     addTopic: (eventId, text, authorId) => postRequest('addTopic', { eventId, text, authorId }),
-    toggleTopicVote: (topicId, profileId) => postRequest('toggleTopicVote', { topicId, profileId }),
+    toggleTopicVote: (topicId, profileId, voteType = 1) => postRequest('toggletopicvote', { topicId, profileId, voteType }),
     toggleDateVote: (optionId, profileId) => postRequest('toggleDateVote', { optionId, profileId }),
     saveProfile: (id, name, bio) => postRequest('saveProfile', { id, name, bio }),
     getEvents: () => request('getEvents'),
     createEvent: (eventData) => postRequest('createEvent', eventData),
     updateEvent: (id, eventData) => postRequest('saveevent', { id, ...eventData }),
     getMembers: () => request('getMembers'),
+    deleteMember: (memberId) => postRequest('deletemember', { memberId }),
     getDiagnostics: () => request('diagnostics'),
 };

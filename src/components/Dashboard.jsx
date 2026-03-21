@@ -1,21 +1,32 @@
 import React, { useState, useEffect } from 'react'
 import { api } from '../lib/api'
-import { ThumbsUp, Plus, Calendar, MapPin, Trash2 } from 'lucide-react'
+import { ThumbsUp, ThumbsDown, Plus, Calendar, MapPin, Trash2, UsersIcon, LayoutGrid, MessageSquare } from 'lucide-react'
 
 export default function Dashboard({ session, profile }) {
+    const [activeTab, setActiveTab] = useState('meetings')
     const [event, setEvent] = useState(null)
     const [topics, setTopics] = useState([])
     const [dateOptions, setDateOptions] = useState([])
     const [newTopic, setNewTopic] = useState('')
-    const [loading, setLoading] = useState(true)
+    const [loadingEvent, setLoadingEvent] = useState(true)
+    
+    // Users state
+    const [members, setMembers] = useState([])
+    const [loadingMembers, setLoadingMembers] = useState(false)
 
     useEffect(() => {
         fetchActiveEvent()
     }, [])
 
+    useEffect(() => {
+        if (activeTab === 'users' && members.length === 0) {
+            fetchMembers()
+        }
+    }, [activeTab])
+
     async function fetchActiveEvent() {
         try {
-            setLoading(true)
+            setLoadingEvent(true)
             const res = await api.getEvent();
             if (res.error) {
                 alert(`Chyba načítání: ${res.error}`);
@@ -24,20 +35,17 @@ export default function Dashboard({ session, profile }) {
             setEvent(eventData)
 
             if (eventData) {
-                // Normalizace ID - může přijít jako 'id' nebo 'ID' nebo 'Id'
                 const eventId = eventData.id || eventData.ID || eventData.Id;
                 if (eventId) {
                     fetchTopics(eventId)
                     fetchDateOptions(eventId)
-                } else {
-                    console.error('Event ID not found in data:', eventData);
                 }
             }
         } catch (error) {
             console.error('Error fetching event:', error.message)
             alert(`Chyba připojení: ${error.message}`);
         } finally {
-            setLoading(false)
+            setLoadingEvent(false)
         }
     }
 
@@ -51,6 +59,15 @@ export default function Dashboard({ session, profile }) {
         setDateOptions(data || [])
     }
 
+    async function fetchMembers() {
+        setLoadingMembers(true)
+        const data = await api.getMembers()
+        setMembers(data || [])
+        setLoadingMembers(false)
+    }
+
+    const [votingId, setVotingId] = useState(null)
+    
     async function handleAddTopic(e) {
         e.preventDefault()
         if (!newTopic.trim() || votingId) return
@@ -67,35 +84,39 @@ export default function Dashboard({ session, profile }) {
         }
     }
 
-    const [votingId, setVotingId] = useState(null)
-
-    async function toggleVote(topicId) {
-        // Optimistická aktualizace
+    async function toggleVote(topicId, voteType = 1) {
         const oldTopics = [...topics];
         setTopics(prev => prev.map(t => {
             if (t.id === topicId) {
                 const votes = t.votes || [];
-                const hasVoted = votes.some(v => String(v.profile_id).toLowerCase() === String(session.user.id).toLowerCase());
-                return {
-                    ...t,
-                    votes: hasVoted
-                        ? votes.filter(v => String(v.profile_id).toLowerCase() !== String(session.user.id).toLowerCase())
-                        : [...votes, { profile_id: session.user.id }]
-                };
+                const existingVote = votes.find(v => String(v.profile_id).toLowerCase() === String(session.user.id).toLowerCase());
+                
+                let newVotes;
+                if (existingVote) {
+                    const currentVoteType = parseInt(existingVote.vote_type) || 1;
+                    if (currentVoteType === voteType) {
+                        newVotes = votes.filter(v => String(v.profile_id).toLowerCase() !== String(session.user.id).toLowerCase());
+                    } else {
+                        newVotes = votes.map(v => String(v.profile_id).toLowerCase() === String(session.user.id).toLowerCase() ? { ...v, vote_type: voteType } : v);
+                    }
+                } else {
+                    newVotes = [...votes, { profile_id: session.user.id, vote_type: voteType }];
+                }
+                return { ...t, votes: newVotes };
             }
             return t;
         }));
 
         try {
-            const res = await api.toggleTopicVote(topicId, session.user.id);
+            const res = await api.toggleTopicVote(topicId, session.user.id, voteType);
             if (res.error) {
-                setTopics(oldTopics); // Rollback
+                setTopics(oldTopics); 
                 alert(`Nepodařilo se hlasovat: ${res.error}`);
             } else {
-                await fetchTopics(event.id); // Tichá synchronizace
+                await fetchTopics(event.id);
             }
         } catch (err) {
-            setTopics(oldTopics); // Rollback
+            setTopics(oldTopics);
             alert(`Chyba sítě: ${err.message}`);
         }
     }
@@ -112,7 +133,6 @@ export default function Dashboard({ session, profile }) {
     }
 
     async function toggleDateVote(optionId) {
-        // Optimistická aktualizace - OKAMŽITÁ ZMĚNA BEZ BLOKOVÁNÍ
         const oldOptions = [...dateOptions];
         setDateOptions(prev => prev.map(o => {
             if (o.id === optionId) {
@@ -131,139 +151,265 @@ export default function Dashboard({ session, profile }) {
         try {
             const res = await api.toggleDateVote(optionId, session.user.id);
             if (res.error) {
-                setDateOptions(oldOptions); // Rollback
+                setDateOptions(oldOptions);
                 alert(`Nepodařilo se hlasovat o termínu: ${res.error}`);
             } else {
-                await fetchDateOptions(event.id); // Tichá synchronizace
+                await fetchDateOptions(event.id);
             }
         } catch (err) {
-            setDateOptions(oldOptions); // Rollback
+            setDateOptions(oldOptions);
             alert(`Chyba sítě: ${err.message}`);
         }
     }
 
-    if (loading) return <div className="text-center py-12">Načítám událost...</div>
-    if (!event) return <div className="text-center py-12">Momentálně není naplánovaná žádná událost.</div>
+    async function handleDeleteMember(memberId) {
+        if (!confirm('Opravdu chcete tohoto uživatele smazat? Tato akce je nevratná.')) return;
+        setLoadingMembers(true);
+        try {
+            const res = await api.deleteMember(memberId);
+            if (res.error) alert(`Chyba při mazání: ${res.error}`);
+            else await fetchMembers();
+        } catch (err) {
+            alert(`Chyba sítě: ${err.message}`);
+        } finally {
+            setLoadingMembers(false);
+        }
+    }
+
+    if (loadingEvent && activeTab === 'meetings') return <div className="text-center py-12">Načítám událost...</div>
 
     return (
-        <div className="space-y-8 transition-opacity">
-            {/* Event Header */}
-            <section className="bg-slate-900 border border-slate-800 rounded-2xl p-8 relative overflow-hidden">
-                <div className="relative z-10">
-                    <h2 className="text-4xl font-black mb-4 tracking-tighter">{event.title}</h2>
-                    <p className="text-slate-400 text-lg mb-6 max-w-2xl">{event.description}</p>
-                    <div className="flex flex-wrap gap-4 text-sm text-slate-300">
-                        <div className="flex items-center gap-2 bg-slate-800 px-3 py-1 rounded-full border border-slate-700">
-                            <MapPin size={16} className="text-pink-500" />
-                            {event.venue}
-                        </div>
-                    </div>
-                </div>
-                <div className="absolute top-0 right-0 w-64 h-64 bg-purple-600/10 blur-[100px] -mr-32 -mt-32"></div>
-            </section>
+        <div className="space-y-8">
+            {/* Tabs Navigation */}
+            <div className="flex justify-center border-b border-slate-800">
+                <nav className="flex space-x-8" aria-label="Tabs">
+                    <button
+                        onClick={() => setActiveTab('users')}
+                        className={`flex items-center gap-2 py-4 px-1 border-b-2 font-medium text-sm transition-colors ${activeTab === 'users' ? 'border-purple-500 text-purple-400' : 'border-transparent text-slate-400 hover:text-slate-300 hover:border-slate-700'}`}
+                    >
+                        <UsersIcon size={18} /> Uživatelé
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('meetings')}
+                        className={`flex items-center gap-2 py-4 px-1 border-b-2 font-medium text-sm transition-colors ${activeTab === 'meetings' ? 'border-pink-500 text-pink-400' : 'border-transparent text-slate-400 hover:text-slate-300 hover:border-slate-700'}`}
+                    >
+                        <Calendar size={18} /> Setkání
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('topics')}
+                        className={`flex items-center gap-2 py-4 px-1 border-b-2 font-medium text-sm transition-colors ${activeTab === 'topics' ? 'border-indigo-500 text-indigo-400' : 'border-transparent text-slate-400 hover:text-slate-300 hover:border-slate-700'}`}
+                    >
+                        <MessageSquare size={18} /> Témata
+                    </button>
+                </nav>
+            </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                {/* Topics Section */}
-                <section className="space-y-6">
-                    <div className="flex items-center justify-between">
-                        <h3 className="text-xl font-bold flex items-center gap-2">
-                            <Plus size={20} className="text-purple-400" /> Navržená témata
-                        </h3>
-                    </div>
-
-                    <form onSubmit={handleAddTopic} className="flex gap-2">
-                        <input
-                            type="text"
-                            placeholder="Navrhni téma..."
-                            className="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-4 py-2 text-sm focus:ring-2 focus:ring-purple-500 outline-none"
-                            value={newTopic}
-                            onChange={(e) => setNewTopic(e.target.value)}
-                        />
-                        <button type="submit" className="bg-purple-600 hover:bg-purple-500 px-4 py-2 rounded-lg font-bold text-sm transition-colors">
-                            {votingId === 'new-topic' ? '...' : 'Přidat'}
-                        </button>
-                    </form>
-
-                    <div className="space-y-3">
-                        {topics.length === 0 && <p className="text-slate-500 text-sm">Zatím žádná témata. Buď první!</p>}
-                        {topics.map(topic => (
-                            <div
-                                key={topic.id}
-                                className={`bg-slate-900 border border-slate-800 p-4 rounded-xl flex items-start justify-between gap-4 transition-opacity`}
-                            >
-                                <div>
-                                    <p className="text-white font-medium mb-1">{topic.text || topic.label || 'Bez textu'}</p>
-                                    <p className="text-xs text-slate-500">Navrhl/a {topic.author?.name || 'Anonym'}</p>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                    <button
-                                        onClick={() => toggleVote(topic.id)}
-                                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border transition-all ${topic.votes?.some(v => String(v.profile_id).toLowerCase() === String(session.user.id).toLowerCase())
-                                            ? 'bg-purple-600/20 border-purple-500 text-purple-400'
-                                            : 'border-slate-700 text-slate-400 hover:border-slate-600'
-                                            }`}
-                                    >
-                                        <ThumbsUp size={14} />
-                                        <span className="text-xs font-bold">{topic.votes?.length || 0}</span>
-                                    </button>
-                                    {profile?.is_admin && (
-                                        <button
-                                            onClick={() => handleDeleteTopic(topic.id)}
-                                            className="p-1.5 text-slate-500 hover:text-red-500 transition-colors"
-                                            title="Smazat téma"
+            {/* TAB CONTENT: USERS */}
+            {activeTab === 'users' && (
+                <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl animate-in fade-in slide-in-from-bottom-4 duration-500">
+                    <h2 className="text-2xl font-bold mb-6 flex items-center gap-2">
+                        <UsersIcon className="text-purple-400" /> Komunita
+                    </h2>
+                    {loadingMembers ? (
+                        <div className="text-center py-8 text-slate-400">Načítám uživatele...</div>
+                    ) : (
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            {members.map(member => (
+                                <div key={member.id} className="bg-slate-800 p-4 rounded-xl flex flex-col justify-between border border-slate-700 hover:border-purple-500/50 transition-colors">
+                                    <div className="mb-4">
+                                        <div className="flex items-center justify-between">
+                                            <h3 className="font-bold text-lg text-white">{member.name || 'Anonym'}</h3>
+                                            {(String(member.is_admin).toLowerCase() === 'true' || member.is_admin === true) && (
+                                                <span className="text-[10px] uppercase font-black tracking-wider bg-purple-500/20 text-purple-400 px-2 py-0.5 rounded text-center">Admin</span>
+                                            )}
+                                        </div>
+                                        <p className="text-xs text-slate-400 mt-1">{member.id}</p>
+                                        {member.bio && <p className="text-sm text-slate-300 mt-3 line-clamp-3">{member.bio}</p>}
+                                    </div>
+                                    {profile?.is_admin && String(member.id).toLowerCase() !== String(session.user.id).toLowerCase() && (
+                                        <button 
+                                            onClick={() => handleDeleteMember(member.id)}
+                                            className="text-red-400 hover:text-red-300 hover:bg-red-400/10 px-3 py-1.5 flex items-center gap-2 rounded-lg text-xs font-bold transition-colors w-fit"
                                         >
-                                            <Trash2 size={16} />
+                                            <Trash2 size={14} /> Smazat uživatele
                                         </button>
                                     )}
                                 </div>
-                            </div>
-                        ))}
-                    </div>
-                </section>
+                            ))}
+                            {members.length === 0 && <p className="text-slate-500">Žádní uživatelé nenalezeni.</p>}
+                        </div>
+                    )}
+                </div>
+            )}
 
-                {/* Date Voting Section */}
-                <section className="space-y-6">
-                    <h3 className="text-xl font-bold flex items-center gap-2">
-                        <Calendar size={20} className="text-pink-400" /> Hlasování o termínu
-                    </h3>
-
-                    <div className="space-y-3">
-                        {dateOptions.map(option => {
-                            const isSelected = option.votes?.some(v => String(v.profile_id).toLowerCase() === String(session.user.id).toLowerCase());
-                            return (
-                                <button
-                                    key={option.id}
-                                    onClick={() => toggleDateVote(option.id)}
-                                    className={`w-full text-left p-4 rounded-xl border transition-all flex items-center justify-between group ${isSelected
-                                        ? 'bg-pink-600/20 border-pink-500 ring-2 ring-pink-500/50 shadow-[0_0_15px_rgba(236,72,153,0.2)]'
-                                        : 'bg-slate-900 border-slate-800 hover:border-pink-500/50 hover:bg-slate-800/50'
-                                        }`}
-                                >
-                                    <div className="flex items-center gap-4">
-                                        <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition-colors ${isSelected ? 'bg-pink-500 border-pink-500' : 'border-slate-700 group-hover:border-pink-500/50'}`}>
-                                            {isSelected && <Plus size={14} className="text-white rotate-45" />}
+            {/* TAB CONTENT: MEETINGS */}
+            {activeTab === 'meetings' && (
+                <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                    {!event ? (
+                        <div className="text-center py-12 bg-slate-900 border border-slate-800 rounded-2xl">Momentálně není naplánovaná žádná událost.</div>
+                    ) : (
+                        <>
+                            <section className="bg-slate-900 border border-slate-800 rounded-2xl p-8 relative overflow-hidden">
+                                <div className="relative z-10">
+                                    <h2 className="text-4xl font-black mb-4 tracking-tighter">{event.title}</h2>
+                                    <p className="text-slate-400 text-lg mb-6 max-w-2xl">{event.description}</p>
+                                    <div className="flex flex-wrap gap-4 text-sm text-slate-300">
+                                        <div className="flex items-center gap-2 bg-slate-800 px-3 py-1 rounded-full border border-slate-700">
+                                            <MapPin size={16} className="text-pink-500" />
+                                            {event.venue || 'Místo bude upřesněno'}
                                         </div>
-                                        <span className={`font-semibold text-lg ${isSelected ? 'text-pink-100' : 'text-slate-300'}`}>
-                                            {(() => {
-                                                const label = option.label || option.termin || option.datum || option.text || option.Label || option.Kdy || option.kdy;
-                                                if (label) return label;
-                                                const fallback = Object.entries(option).find(([k, v]) =>
-                                                    typeof v === 'string' && v.length > 2 && !['id', 'event_id', 'profile_id'].includes(k.toLowerCase())
-                                                );
-                                                return fallback ? fallback[1] : 'Termín neuveden';
-                                            })()}
-                                        </span>
                                     </div>
-                                    <div className={`px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider ${isSelected ? 'bg-pink-500 text-white' : 'bg-slate-800 text-slate-500'}`}>
-                                        {option.votes?.length || 0} hlasů
-                                    </div>
+                                </div>
+                                <div className="absolute top-0 right-0 w-64 h-64 bg-pink-600/10 blur-[100px] -mr-32 -mt-32 pointer-events-none"></div>
+                            </section>
+
+                            <section className="bg-slate-900 border border-slate-800 rounded-2xl p-8">
+                                <h3 className="text-xl font-bold flex items-center gap-2 mb-6">
+                                    <Calendar size={20} className="text-pink-400" /> Termíny a Hlasování
+                                </h3>
+                                <div className="space-y-3 max-w-2xl">
+                                    {dateOptions.map(option => {
+                                        const isSelected = option.votes?.some(v => String(v.profile_id).toLowerCase() === String(session.user.id).toLowerCase());
+                                        return (
+                                            <button
+                                                key={option.id}
+                                                onClick={() => toggleDateVote(option.id)}
+                                                className={`w-full text-left p-4 rounded-xl border transition-all flex items-center justify-between group ${isSelected
+                                                    ? 'bg-pink-600/20 border-pink-500 ring-2 ring-pink-500/50 shadow-[0_0_15px_rgba(236,72,153,0.2)]'
+                                                    : 'bg-slate-800 border-slate-700 hover:border-pink-500/50 hover:bg-slate-800/80'
+                                                    }`}
+                                            >
+                                                <div className="flex items-center gap-4">
+                                                    <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition-colors ${isSelected ? 'bg-pink-500 border-pink-500' : 'border-slate-600 group-hover:border-pink-500/50'}`}>
+                                                        {isSelected && <Plus size={14} className="text-white rotate-45" />}
+                                                    </div>
+                                                    <span className={`font-semibold text-lg ${isSelected ? 'text-pink-100' : 'text-slate-300'}`}>
+                                                        {(() => {
+                                                            const label = option.label || option.termin || option.datum || option.text || option.Label || option.Kdy || option.kdy;
+                                                            if (label) return label;
+                                                            const fallback = Object.entries(option).find(([k, v]) =>
+                                                                typeof v === 'string' && v.length > 2 && !['id', 'event_id', 'profile_id'].includes(k.toLowerCase())
+                                                            );
+                                                            return fallback ? fallback[1] : 'Termín neuveden';
+                                                        })()}
+                                                    </span>
+                                                </div>
+                                                <div className={`px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider ${isSelected ? 'bg-pink-500 text-white' : 'bg-slate-700 text-slate-400'}`}>
+                                                    {option.votes?.length || 0} hlasů
+                                                </div>
+                                            </button>
+                                        );
+                                    })}
+                                    {dateOptions.length === 0 && <p className="text-slate-500 text-sm italic py-4">Pro tuto událost nejsou vypsány žádné termíny hlasování.</p>}
+                                </div>
+                            </section>
+                        </>
+                    )}
+                </div>
+            )}
+
+            {/* TAB CONTENT: TOPICS */}
+            {activeTab === 'topics' && (
+                <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                    {!event ? (
+                        <div className="text-center py-12 bg-slate-900 border border-slate-800 rounded-2xl">Událost nenalezena, nelze přidávat témata.</div>
+                    ) : (
+                        <section className="bg-slate-900 border border-slate-800 rounded-2xl p-8 shadow-xl">
+                            <div className="flex items-center justify-between mb-6">
+                                <div>
+                                    <h3 className="text-2xl font-bold flex items-center gap-2 text-white">
+                                        <MessageSquare size={24} className="text-indigo-400" /> Témata k diskuzi
+                                    </h3>
+                                    <p className="text-slate-400 text-sm mt-1">Hlasuj pro témata, která tě nejvíc zajímají. Vítězné téma vybereme na další sraz.</p>
+                                </div>
+                            </div>
+
+                            <form onSubmit={handleAddTopic} className="flex gap-2 mb-8">
+                                <input
+                                    type="text"
+                                    placeholder="Navrhni vlastní téma (např. 'React Hooks do hloubky')..."
+                                    className="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-4 py-3 text-sm focus:ring-2 focus:ring-indigo-500 outline-none placeholder-slate-500"
+                                    value={newTopic}
+                                    onChange={(e) => setNewTopic(e.target.value)}
+                                />
+                                <button type="submit" className="bg-indigo-600 hover:bg-indigo-500 px-6 py-3 rounded-lg font-bold text-sm transition-colors shadow-lg shadow-indigo-500/20">
+                                    {votingId === 'new-topic' ? '...' : 'Přidat téma'}
                                 </button>
-                            );
-                        })}
-                        {dateOptions.length === 0 && <p className="text-slate-500 text-sm italic py-4">Pro tuto událost nejsou vypsány žádné termíny hlasování.</p>}
-                    </div>
-                </section>
-            </div>
+                            </form>
+
+                            <div className="space-y-4">
+                                {topics.length === 0 && <p className="text-slate-500 text-sm py-8 text-center bg-slate-800/50 rounded-xl border border-slate-800 border-dashed">Zatím žádná témata. Buď první, kdo nějaké přidá!</p>}
+                                {topics.sort((a,b) => {
+                                    const aScore = (a.votes||[]).reduce((acc, v) => acc + (parseInt(v.vote_type)||1), 0);
+                                    const bScore = (b.votes||[]).reduce((acc, v) => acc + (parseInt(v.vote_type)||1), 0);
+                                    return bScore - aScore;
+                                }).map(topic => {
+                                    const topicVotes = topic.votes || [];
+                                    const myVote = topicVotes.find(v => String(v.profile_id).toLowerCase() === String(session.user.id).toLowerCase());
+                                    const myVoteType = myVote ? (parseInt(myVote.vote_type) || 1) : 0;
+                                    
+                                    const upvotes = topicVotes.filter(v => (parseInt(v.vote_type) || 1) > 0).length;
+                                    const downvotes = topicVotes.filter(v => parseInt(v.vote_type) < 0).length;
+                                    const score = upvotes - downvotes;
+
+                                    return (
+                                        <div
+                                            key={topic.id}
+                                            className="bg-slate-800 border border-slate-700 p-5 rounded-xl flex items-start justify-between gap-4 transition-all hover:border-indigo-500/30 group"
+                                        >
+                                            <div className="flex-1">
+                                                <div className="flex items-center gap-3 mb-1">
+                                                    <span className={`text-lg font-bold ${score > 0 ? 'text-green-400' : score < 0 ? 'text-red-400' : 'text-slate-300'}`}>
+                                                        {score > 0 ? '+' : ''}{score}
+                                                    </span>
+                                                    <p className="text-white font-medium text-lg">{topic.text || topic.label || 'Bez textu'}</p>
+                                                </div>
+                                                <p className="text-sm text-slate-500 ml-10">od {topic.author?.name || 'Anonyma'}</p>
+                                            </div>
+                                            <div className="flex items-center gap-2 shrink-0">
+                                                {/* Upvote Button */}
+                                                <button
+                                                    onClick={() => toggleVote(topic.id, 1)}
+                                                    className={`flex items-center gap-1.5 px-3 py-2 rounded-lg border transition-all ${myVoteType === 1
+                                                        ? 'bg-green-500/20 border-green-500 text-green-400 shadow-[0_0_10px_rgba(34,197,94,0.2)]'
+                                                        : 'border-slate-600 text-slate-400 hover:border-green-500/50 hover:text-green-400 bg-slate-900'
+                                                        }`}
+                                                >
+                                                    <ThumbsUp size={16} className={myVoteType === 1 ? 'fill-current' : ''} />
+                                                    <span className="text-xs font-bold">{upvotes}</span>
+                                                </button>
+                                                
+                                                {/* Downvote Button */}
+                                                <button
+                                                    onClick={() => toggleVote(topic.id, -1)}
+                                                    className={`flex items-center gap-1.5 px-3 py-2 rounded-lg border transition-all ${myVoteType === -1
+                                                        ? 'bg-red-500/20 border-red-500 text-red-400 shadow-[0_0_10px_rgba(239,68,68,0.2)]'
+                                                        : 'border-slate-600 text-slate-400 hover:border-red-500/50 hover:text-red-400 bg-slate-900'
+                                                        }`}
+                                                >
+                                                    <ThumbsDown size={16} className={myVoteType === -1 ? 'fill-current' : ''} />
+                                                    <span className="text-xs font-bold">{downvotes}</span>
+                                                </button>
+
+                                                {/* Admin Delete */}
+                                                {profile?.is_admin && (
+                                                    <button
+                                                        onClick={() => handleDeleteTopic(topic.id)}
+                                                        className="ml-2 p-2 text-slate-500 hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
+                                                        title="Smazat téma"
+                                                    >
+                                                        <Trash2 size={16} />
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </div>
+                                    )
+                                })}
+                            </div>
+                        </section>
+                    )}
+                </div>
+            )}
         </div>
     )
 }

@@ -3,7 +3,7 @@
  * 
  * Instructions:
  * 1. Create a new Google Sheet.
- * 2. Rename sheets (tabs) to: "profiles", "events", "topics", "topic_votes", "date_options", "date_votes".
+ * 2. Rename sheets (tabs) to: "profiles", "events", "topics", "topic_votes", "date_options", "date_votes", "login_tokens".
  * 3. Go to Extensions -> Apps Script.
  * 4. Paste this code.
  * 5. Click "Deploy" -> "New Deployment" -> "Web App".
@@ -11,7 +11,7 @@
  * 7. Copy the Web App URL and put it in your .env file as VITE_API_URL.
  */
 
-const VERSION = "1.0.8";
+const VERSION = "1.1.0";
 
 function doGet(e) {
   try {
@@ -111,15 +111,81 @@ function doPost(e) {
     const action = String(data.action || "").trim().toLowerCase();
     const ss = SpreadsheetApp.getActiveSpreadsheet();
 
+    if (action === 'sendmagiclink') {
+      const email = String(data.email).toLowerCase().trim();
+      let sheet = ss.getSheetByName('login_tokens');
+      if (!sheet) {
+        sheet = ss.insertSheet('login_tokens');
+        sheet.appendRow(['token', 'email', 'created_at']);
+      }
+      
+      const token = Utilities.getUuid();
+      sheet.appendRow([token, email, new Date()]);
+      
+      const appUrl = data.appUrl || 'https://vibe-coding-komunita.netlify.app'; // Fallback
+      const loginUrl = appUrl.includes('?') ? `${appUrl}&token=${token}` : `${appUrl}?token=${token}`;
+      
+      MailApp.sendEmail({
+        to: email,
+        subject: "Přihlášení - Vibe Coding Ostrava",
+        htmlBody: `<h3>Vítej ve Vibe Coding Ostrava!</h3><p>Pro přihlášení klikni na následující odkaz:</p><p><a href="${loginUrl}" style="padding: 10px 20px; background-color: #9333ea; color: white; text-decoration: none; border-radius: 5px;">Přihlásit se</a></p><p>Pokud jsi o tento e-mail nežádal/a, můžeš ho ignorovat.</p>`
+      });
+      
+      return jsonResponse({ success: true });
+    }
+
+    if (action === 'verifytoken') {
+      const token = String(data.token).trim();
+      const sheet = ss.getSheetByName('login_tokens');
+      if (!sheet) return jsonResponse({ error: 'Sheet "login_tokens" not found' });
+      
+      const rows = sheet.getDataRange().getValues();
+      const rowIndex = rows.findIndex((row, idx) => idx > 0 && String(row[0]) === token);
+      
+      if (rowIndex > -1) {
+        const email = String(rows[rowIndex][1]).toLowerCase().trim();
+        sheet.deleteRow(rowIndex + 1); // Mark as used
+        const isAdmin = email === 'luciesteffkova@gmail.com';
+        
+        const profiles = getSheetData('profiles');
+        let profile = profiles.find(p => String(p.id || p.Id).toLowerCase() === email);
+        
+        if (!profile) {
+          const profileSheet = ss.getSheetByName('profiles');
+          profileSheet.appendRow([email, email.split('@')[0], '', isAdmin, new Date()]);
+          profile = { id: email, name: email.split('@')[0], is_admin: isAdmin };
+        } else if (isAdmin && !profile.is_admin) {
+           const pRows = ss.getSheetByName('profiles').getDataRange().getValues();
+           const pHeaders = pRows[0].map(h => normalizeHeader(h));
+           const pRowIdx = pRows.findIndex((r, idx) => idx > 0 && String(r[0]).toLowerCase() === email);
+           if (pRowIdx > -1 && pHeaders.indexOf('is_admin') > -1) {
+             ss.getSheetByName('profiles').getRange(pRowIdx + 1, pHeaders.indexOf('is_admin') + 1).setValue(true);
+             profile.is_admin = true;
+           }
+        }
+        return jsonResponse({ session: { user: { id: email, email: email } }, profile: profile });
+      }
+      return jsonResponse({ error: 'Neplatný nebo vypršelý odkaz.' });
+    }
+
     if (action === 'login') {
       const email = String(data.email).toLowerCase().trim();
       const profiles = getSheetData('profiles');
       let profile = profiles.find(p => String(p.id || p.Id).toLowerCase() === email);
+      const isAdmin = email === 'luciesteffkova@gmail.com';
       
       if (!profile) {
         const sheet = ss.getSheetByName('profiles');
-        sheet.appendRow([email, email.split('@')[0], '', false, new Date()]);
-        profile = { id: email, name: email.split('@')[0], is_admin: false };
+        sheet.appendRow([email, email.split('@')[0], '', isAdmin, new Date()]);
+        profile = { id: email, name: email.split('@')[0], is_admin: isAdmin };
+      } else if (isAdmin && !profile.is_admin) {
+           const pRows = ss.getSheetByName('profiles').getDataRange().getValues();
+           const pHeaders = pRows[0].map(h => normalizeHeader(h));
+           const pRowIdx = pRows.findIndex((r, idx) => idx > 0 && String(r[0]).toLowerCase() === email);
+           if (pRowIdx > -1 && pHeaders.indexOf('is_admin') > -1) {
+             ss.getSheetByName('profiles').getRange(pRowIdx + 1, pHeaders.indexOf('is_admin') + 1).setValue(true);
+             profile.is_admin = true;
+           }
       }
       return jsonResponse({ session: { user: { id: email, email: email } }, profile: profile });
     }
@@ -139,10 +205,13 @@ function doPost(e) {
       const headers = votesRows[0].map(h => normalizeHeader(h));
       const topicIdIdx = headers.indexOf('topic_id');
       const profileIdIdx = headers.indexOf('profile_id');
+      const voteTypeIdx = headers.indexOf('vote_type');
       
       if (topicIdIdx === -1 || profileIdIdx === -1) {
         return jsonResponse({ error: 'Required columns (topic_id, profile_id) not found in topic_votes' });
       }
+      
+      const voteType = data.voteType || 1; // 1 for up, -1 for down
       
       const existingRowIndex = votesRows.findIndex((row, idx) => 
         idx > 0 && 
@@ -151,11 +220,22 @@ function doPost(e) {
       );
       
       if (existingRowIndex > -1) {
-        sheet.deleteRow(existingRowIndex + 1);
+        const currVote = voteTypeIdx > -1 ? parseInt(votesRows[existingRowIndex][voteTypeIdx]) || 1 : 1;
+        if (currVote === parseInt(voteType)) {
+          sheet.deleteRow(existingRowIndex + 1);
+        } else {
+          if (voteTypeIdx > -1) {
+            sheet.getRange(existingRowIndex + 1, voteTypeIdx + 1).setValue(voteType);
+          } else {
+            // Unvote if column doesn't exist
+            sheet.deleteRow(existingRowIndex + 1);
+          }
+        }
       } else {
         const newRow = new Array(headers.length).fill("");
         newRow[topicIdIdx] = data.topicId;
         newRow[profileIdIdx] = data.profileId;
+        if (voteTypeIdx > -1) newRow[voteTypeIdx] = voteType;
         sheet.appendRow(newRow);
       }
       return jsonResponse({ success: true });
@@ -203,6 +283,22 @@ function doPost(e) {
         sheet.getRange(rowIndex + 1, headers.indexOf('bio') + 1).setValue(data.bio);
       }
       return jsonResponse({ success: true });
+    }
+
+    if (action === 'deletemember') {
+      const sheet = ss.getSheetByName('profiles');
+      if (!sheet) return jsonResponse({ error: 'Profiles sheet not found' });
+      const dataRows = sheet.getDataRange().getValues();
+      const headers = dataRows[0].map(h => normalizeHeader(h));
+      const idIndex = headers.indexOf('profile_id') > -1 ? headers.indexOf('profile_id') : 0; // fallback to col 0 which is usually ID
+      
+      const rowIndex = dataRows.findIndex((row, idx) => idx > 0 && String(row[idIndex]).trim().toLowerCase() === String(data.memberId).trim().toLowerCase());
+      
+      if (rowIndex > -1) {
+        sheet.deleteRow(rowIndex + 1);
+        return jsonResponse({ success: true });
+      }
+      return jsonResponse({ error: 'Member not found: ' + data.memberId });
     }
 
     if (action === 'createevent') {
@@ -288,6 +384,7 @@ function normalizeHeader(h) {
   if (clean === 'vytvoreno' || clean === 'created_at' || clean === 'cas_vytvoreni') return 'created_at';
   if (clean === 'is_active' || clean === 'aktivni' || clean === 'stav') return 'is_active';
   if (clean === 'is_admin' || clean === 'admin' || clean === 'spravce') return 'is_admin';
+  if (clean === 'vote_type' || clean === 'typ_hlasu' || clean === 'hlas') return 'vote_type';
 
   // 2. OBECNÁ MAPOVÁNÍ PRO POPISKY (jako poslední záchrana)
   if (clean === 'text') return 'text'; 

@@ -21,7 +21,27 @@ function App() {
     const [showAdmin, setShowAdmin] = useState(false)
 
     useEffect(() => {
-        if (session && !profile) {
+        const params = new URLSearchParams(window.location.search);
+        const token = params.get('token');
+        
+        if (token) {
+            setLoading(true);
+            api.verifyToken(token).then(res => {
+                if (res.session && res.profile) {
+                    setSession(res.session);
+                    setProfile(res.profile);
+                    localStorage.setItem('vibe_session', JSON.stringify(res.session));
+                    localStorage.setItem('vibe_profile', JSON.stringify(res.profile));
+                    window.history.replaceState({}, document.title, window.location.pathname);
+                } else {
+                    alert('Chyba ověření: ' + (res.error || 'Neplatný odkaz'));
+                }
+                setLoading(false);
+            }).catch(err => {
+                alert('Chyba serveru: ' + err.message);
+                setLoading(false);
+            });
+        } else if (session && !profile) {
             // Re-fetch profile if session exists but profile doesn't
             setLoading(true);
             api.login(session.user.id).then(res => {
@@ -66,7 +86,7 @@ function App() {
     )
 
     if (!session) {
-        return <Auth onLogin={handleLogin} />
+        return <Auth />
     }
 
     if (!profile || !profile.name) {
