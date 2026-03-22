@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { api } from '../lib/api'
 import { getAvatarById } from '../lib/avatars'
-import { ThumbsUp, ThumbsDown, Plus, Calendar, MapPin, Trash2, UsersIcon, LayoutGrid, MessageSquare } from 'lucide-react'
+import { ThumbsUp, ThumbsDown, Plus, Calendar, MapPin, Trash2, UsersIcon, LayoutGrid, MessageSquare, CheckCircle, XCircle, UserCheck } from 'lucide-react'
 
 export default function Dashboard({ session, profile }) {
     const [activeTab, setActiveTab] = useState('meetings')
@@ -14,6 +14,10 @@ export default function Dashboard({ session, profile }) {
     // Users state
     const [members, setMembers] = useState([])
     const [loadingMembers, setLoadingMembers] = useState(false)
+
+    // RSVP state
+    const [rsvps, setRsvps] = useState([])
+    const [rsvpLoading, setRsvpLoading] = useState(false)
 
     useEffect(() => {
         fetchActiveEvent()
@@ -40,6 +44,7 @@ export default function Dashboard({ session, profile }) {
                 if (eventId) {
                     fetchTopics(eventId)
                     fetchDateOptions(eventId)
+                    fetchRsvps(eventId)
                 }
             }
         } catch (error) {
@@ -60,6 +65,17 @@ export default function Dashboard({ session, profile }) {
         const data = await api.getDateOptions(eventId);
         if (Array.isArray(data)) setDateOptions(data);
         else setDateOptions([]);
+    }
+
+    async function fetchRsvps(eventId) {
+        try {
+            const data = await api.getRsvps(eventId);
+            if (Array.isArray(data)) setRsvps(data);
+            else setRsvps([]);
+        } catch (err) {
+            console.error('Error fetching RSVPs:', err);
+            setRsvps([]);
+        }
     }
 
     async function fetchMembers() {
@@ -173,6 +189,45 @@ export default function Dashboard({ session, profile }) {
         }
     }
 
+    async function handleToggleRsvp() {
+        if (!event || rsvpLoading) return;
+        const eventId = event.id || event.ID || event.Id;
+        
+        // Optimistic update
+        const oldRsvps = [...rsvps];
+        const isCurrentlyAttending = rsvps.some(r => 
+            String(r.profile_id).toLowerCase() === String(session.user.id).toLowerCase()
+        );
+        
+        if (isCurrentlyAttending) {
+            setRsvps(prev => prev.filter(r => 
+                String(r.profile_id).toLowerCase() !== String(session.user.id).toLowerCase()
+            ));
+        } else {
+            setRsvps(prev => [...prev, { profile_id: session.user.id, event_id: eventId, status: 'yes' }]);
+        }
+
+        setRsvpLoading(true);
+        try {
+            const res = await api.toggleRsvp(eventId, session.user.id);
+            if (res?.error) {
+                setRsvps(oldRsvps);
+                alert(`Nepodařilo se změnit účast: ${res.error}`);
+            } else {
+                await fetchRsvps(eventId);
+                // Refresh members to update RSVP labels
+                if (members.length > 0) {
+                    fetchMembers();
+                }
+            }
+        } catch (err) {
+            setRsvps(oldRsvps);
+            alert(`Chyba sítě: ${err.message}`);
+        } finally {
+            setRsvpLoading(false);
+        }
+    }
+
     async function handleDeleteMember(memberId) {
         if (!confirm('Opravdu chcete tohoto uživatele smazat? Tato akce je nevratná.')) return;
         setLoadingMembers(true);
@@ -186,6 +241,11 @@ export default function Dashboard({ session, profile }) {
             setLoadingMembers(false);
         }
     }
+
+    const isAttending = rsvps.some(r => 
+        String(r.profile_id).toLowerCase() === String(session?.user?.id || "").toLowerCase()
+    );
+    const attendeeCount = rsvps.length;
 
     if (loadingEvent && activeTab === 'meetings') return <div className="text-center py-12">Načítám událost...</div>
 
@@ -245,13 +305,20 @@ export default function Dashboard({ session, profile }) {
                                                 );
                                             })()}
                                             <div className="flex-1 min-w-0">
-                                                <div className="flex items-center gap-2 mb-0.5">
+                                                <div className="flex items-center gap-2 mb-0.5 flex-wrap">
                                                     <h3 className="font-bold text-lg text-white truncate">{member.name || 'Anonym'}</h3>
                                                     {(String(member.is_admin).toLowerCase() === 'true' || member.is_admin === true) && (
                                                         <span className="shrink-0 text-[8px] uppercase font-black tracking-wider bg-purple-500/20 text-purple-400 px-1.5 py-0.5 rounded border border-purple-500/30">Admin</span>
                                                     )}
                                                 </div>
-                                                <p className="text-[10px] text-slate-500 truncate font-mono">{member.id}</p>
+                                                {/* RSVP Label */}
+                                                {(member.rsvp === 'yes' || rsvps.some(r => String(r.profile_id).toLowerCase() === String(member.id).toLowerCase())) && (
+                                                    <div className="flex items-center gap-1.5 mt-1">
+                                                        <CheckCircle size={14} className="text-emerald-400" />
+                                                        <span className="text-[11px] font-bold text-emerald-400 uppercase tracking-wider">dorazí na setkání</span>
+                                                    </div>
+                                                )}
+                                                <p className="text-[10px] text-slate-500 truncate font-mono mt-1">{member.id}</p>
                                                 {member.phone && (
                                                     <p className="text-xs text-slate-400 mt-1 flex items-center gap-1.5">
                                                         <span className="text-purple-500">📞</span> {member.phone}
@@ -297,7 +364,9 @@ export default function Dashboard({ session, profile }) {
                             <section className="bg-slate-900 border border-slate-800 rounded-2xl p-8 relative overflow-hidden">
                                 <div className="relative z-10">
                                     <h2 className="text-4xl font-black mb-4 tracking-tighter">{event.title}</h2>
-                                    <p className="text-slate-400 text-lg mb-6 max-w-2xl">{event.description}</p>
+                                    <div className="text-slate-300 text-base mb-6 max-w-2xl whitespace-pre-line leading-relaxed">
+                                        {event.description}
+                                    </div>
                                     <div className="flex flex-wrap gap-4 text-sm text-slate-300">
                                         <div className="flex items-center gap-2 bg-slate-800 px-3 py-1 rounded-full border border-slate-700">
                                             <MapPin size={16} className="text-pink-500" />
@@ -308,46 +377,55 @@ export default function Dashboard({ session, profile }) {
                                 <div className="absolute top-0 right-0 w-64 h-64 bg-pink-600/10 blur-[100px] -mr-32 -mt-32 pointer-events-none"></div>
                             </section>
 
+                            {/* RSVP Section */}
                             <section className="bg-slate-900 border border-slate-800 rounded-2xl p-8">
-                                <h3 className="text-xl font-bold flex items-center gap-2 mb-6">
-                                    <Calendar size={20} className="text-pink-400" /> Termíny a Hlasování
-                                </h3>
-                                <div className="space-y-3 max-w-2xl">
-                                    {Array.isArray(dateOptions) && dateOptions.map(option => {
-                                        const isSelected = Array.isArray(option.votes) && option.votes.some(v => 
-                                            String(v.profile_id || v.id || "").toLowerCase() === String(session?.user?.id || "").toLowerCase()
-                                        );
-                                        return (
-                                            <button
-                                                key={option.id}
-                                                onClick={() => toggleDateVote(option.id)}
-                                                className={`w-full text-left p-4 rounded-xl border transition-all flex items-center justify-between group ${isSelected
-                                                    ? 'bg-pink-600/20 border-pink-500 ring-2 ring-pink-500/50 shadow-[0_0_15px_rgba(236,72,153,0.2)]'
-                                                    : 'bg-slate-800 border-slate-700 hover:border-pink-500/50 hover:bg-slate-800/80'
-                                                    }`}
-                                            >
-                                                <div className="flex items-center gap-4">
-                                                    <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition-colors ${isSelected ? 'bg-pink-500 border-pink-500' : 'border-slate-600 group-hover:border-pink-500/50'}`}>
-                                                        {isSelected && <Plus size={14} className="text-white rotate-45" />}
-                                                    </div>
-                                                    <span className={`font-semibold text-lg ${isSelected ? 'text-pink-100' : 'text-slate-300'}`}>
-                                                        {(() => {
-                                                            const label = option.label || option.termin || option.datum || option.text || option.Label || option.Kdy || option.kdy;
-                                                            if (label) return label;
-                                                            const fallback = Object.entries(option).find(([k, v]) =>
-                                                                typeof v === 'string' && v.length > 2 && !['id', 'event_id', 'profile_id'].includes(k.toLowerCase())
-                                                            );
-                                                            return fallback ? fallback[1] : 'Termín neuveden';
-                                                        })()}
-                                                    </span>
-                                                </div>
-                                                <div className={`px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider ${isSelected ? 'bg-pink-500 text-white' : 'bg-slate-700 text-slate-400'}`}>
-                                                    {option.votes?.length || 0} hlasů
-                                                </div>
-                                            </button>
-                                        );
-                                    })}
-                                    {dateOptions.length === 0 && <p className="text-slate-500 text-sm italic py-4">Pro tuto událost nejsou vypsány žádné termíny hlasování.</p>}
+                                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
+                                    <div>
+                                        <h3 className="text-xl font-bold flex items-center gap-2 mb-2">
+                                            <UserCheck size={20} className="text-emerald-400" /> Účast na setkání
+                                        </h3>
+                                        <p className="text-slate-400 text-sm">Potvrď svou účast, ať víme, kolik nás bude!</p>
+                                    </div>
+                                    
+                                    {/* Attendee Counter */}
+                                    <div className="flex items-center gap-3 bg-slate-800 px-5 py-3 rounded-xl border border-slate-700">
+                                        <div className="flex items-center gap-2">
+                                            <UsersIcon size={20} className="text-emerald-400" />
+                                            <span className="text-3xl font-black text-emerald-400">{attendeeCount}</span>
+                                        </div>
+                                        <span className="text-sm text-slate-400 font-medium">
+                                            {attendeeCount === 1 ? 'účastník' : attendeeCount >= 2 && attendeeCount <= 4 ? 'účastníci' : 'účastníků'}
+                                        </span>
+                                    </div>
+                                </div>
+
+                                <div className="mt-6">
+                                    <button
+                                        onClick={handleToggleRsvp}
+                                        disabled={rsvpLoading}
+                                        className={`w-full sm:w-auto px-8 py-4 rounded-xl font-bold text-lg transition-all flex items-center justify-center gap-3 ${
+                                            isAttending
+                                                ? 'bg-emerald-500/20 border-2 border-emerald-500 text-emerald-400 hover:bg-red-500/20 hover:border-red-500 hover:text-red-400 shadow-[0_0_20px_rgba(16,185,129,0.2)]'
+                                                : 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-500/20 border-2 border-emerald-600 hover:border-emerald-500'
+                                        } disabled:opacity-50`}
+                                    >
+                                        {rsvpLoading ? (
+                                            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-current"></div>
+                                        ) : isAttending ? (
+                                            <>
+                                                <CheckCircle size={22} className="fill-current" />
+                                                <span>Zúčastním se ✓</span>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <Plus size={22} />
+                                                <span>Chci se zúčastnit!</span>
+                                            </>
+                                        )}
+                                    </button>
+                                    {isAttending && (
+                                        <p className="text-xs text-slate-500 mt-2 ml-1">Klikni znovu pro zrušení účasti</p>
+                                    )}
                                 </div>
                             </section>
                         </>

@@ -71,4 +71,6 @@ export const api = {
     getMembers: () => request('getMembers'),
     deleteMember: (memberId) => postRequest('deletemember', { memberId }),
     getDiagnostics: () => request('diagnostics'),
+    getRsvps: (eventId) => request('getrsvps', { eventId }),
+    toggleRsvp: (eventId, profileId) => postRequest('togglerspv', { eventId, profileId }),
 };
