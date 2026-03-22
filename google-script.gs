@@ -105,8 +105,26 @@ function doGet(e) {
       return jsonResponse(result);
     }
 
+    if (action === 'getrsvps') {
+      const eventId = e.parameter.eventId;
+      const rsvps = getSheetData('event_rsvps').filter(r => String(r.event_id || r.Event_Id) === String(eventId) && String(r.status).toLowerCase() === 'yes');
+      return jsonResponse(rsvps);
+    }
+
     if (action === 'getevents') return jsonResponse(getSheetData('events'));
-    if (action === 'getmembers') return jsonResponse(getSheetData('profiles'));
+    if (action === 'getmembers') {
+      const profiles = getSheetData('profiles');
+      // Find active event and attach RSVP info
+      const eventsData = getSheetData('events');
+      const activeEvent = eventsData.find(ev => ev.is_active === true || String(ev.is_active).toLowerCase() === 'true');
+      if (activeEvent) {
+        const rsvps = getSheetData('event_rsvps').filter(r => String(r.event_id || r.Event_Id) === String(activeEvent.id) && String(r.status).toLowerCase() === 'yes');
+        profiles.forEach(p => {
+          p.rsvp = rsvps.some(r => String(r.profile_id).toLowerCase() === String(p.id).toLowerCase()) ? 'yes' : 'no';
+        });
+      }
+      return jsonResponse(profiles);
+    }
 
     return jsonResponse({ error: 'Invalid action: ' + action });
   } catch (err) {
@@ -381,6 +399,46 @@ function doPost(e) {
         return jsonResponse({ success: true });
       }
       return jsonResponse({ error: 'Event not found' });
+    }
+
+    if (action === 'togglerspv') {
+      let sheet = ss.getSheetByName('event_rsvps');
+      if (!sheet) {
+        sheet = ss.insertSheet('event_rsvps');
+        sheet.appendRow(['event_id', 'profile_id', 'status', 'created_at']);
+      }
+      
+      const rows = sheet.getDataRange().getValues();
+      const headers = rows[0].map(h => normalizeHeader(h));
+      const eventIdIdx = headers.indexOf('event_id');
+      const profileIdIdx = headers.indexOf('profile_id');
+      const statusIdx = headers.indexOf('status');
+      
+      if (eventIdIdx === -1 || profileIdIdx === -1) {
+        return jsonResponse({ error: 'Required columns not found in event_rsvps' });
+      }
+      
+      const existingRowIndex = rows.findIndex((row, idx) => 
+        idx > 0 && 
+        String(row[eventIdIdx]) === String(data.eventId) && 
+        String(row[profileIdIdx]).toLowerCase() === String(data.profileId).toLowerCase()
+      );
+      
+      if (existingRowIndex > -1) {
+        // Already exists -> remove (toggle off)
+        sheet.deleteRow(existingRowIndex + 1);
+        return jsonResponse({ success: true, status: 'removed' });
+      } else {
+        // Add RSVP
+        const newRow = new Array(headers.length).fill('');
+        newRow[eventIdIdx] = data.eventId;
+        newRow[profileIdIdx] = data.profileId;
+        if (statusIdx > -1) newRow[statusIdx] = 'yes';
+        const createdIdx = headers.indexOf('created_at');
+        if (createdIdx > -1) newRow[createdIdx] = new Date();
+        sheet.appendRow(newRow);
+        return jsonResponse({ success: true, status: 'added' });
+      }
     }
 
     return jsonResponse({ error: 'Invalid action: ' + action });
