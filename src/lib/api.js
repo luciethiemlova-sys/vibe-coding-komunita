@@ -54,9 +54,9 @@ async function postRequest(action, data = {}) {
 }
 
 export const api = {
-    login: (email) => postRequest('login', { email }),
+    login: (email) => request('login', { email }),
     sendMagicLink: (email, appUrl) => postRequest('sendmagiclink', { email, appUrl }),
-    verifyToken: (token) => postRequest('verifytoken', { token }),
+    verifyToken: (token) => request('verifytoken', { token }),
     getEvent: () => request('getEvent'),
     getTopics: (eventId) => request('getTopics', { eventId }),
     deleteTopic: (topicId) => postRequest('deletetopic', { topicId }),

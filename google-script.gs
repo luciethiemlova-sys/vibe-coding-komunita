@@ -11,7 +11,7 @@
  * 7. Copy the Web App URL and put it in your .env file as VITE_API_URL.
  */
 
-const VERSION = "1.1.1";
+const VERSION = "1.2.0";
 
 // ⚠️ SEM DO UVOZOVEK VLOŽ CELOU ADRESU TVÉ GOOGLE TABULKY!
 const SHEET_URL = "VLOZ_SEM_CELOU_ADRESU_TVE_TABULKY";
@@ -126,6 +126,66 @@ function doGet(e) {
       return jsonResponse(profiles);
     }
 
+    // ✅ VERIFYTOKEN via GET (fixes "Load Failed" CORS issue with POST)
+    if (action === 'verifytoken') {
+      const token = String(e.parameter.token || '').trim();
+      if (!token) return jsonResponse({ error: 'Token chybí.' });
+      const sheet = ss.getSheetByName('login_tokens');
+      if (!sheet) return jsonResponse({ error: 'Sheet "login_tokens" not found' });
+      
+      const rows = sheet.getDataRange().getValues();
+      const rowIndex = rows.findIndex((row, idx) => idx > 0 && String(row[0]) === token);
+      
+      if (rowIndex > -1) {
+        const email = String(rows[rowIndex][1]).toLowerCase().trim();
+        sheet.deleteRow(rowIndex + 1); // Mark as used
+        const isAdmin = email === 'luciesteffkova@gmail.com';
+        
+        const profiles = getSheetData('profiles');
+        let profile = profiles.find(p => String(p.id || p.Id).toLowerCase() === email);
+        
+        if (!profile) {
+          const profileSheet = ss.getSheetByName('profiles');
+          profileSheet.appendRow([email, email.split('@')[0], '', isAdmin, new Date()]);
+          profile = { id: email, name: email.split('@')[0], is_admin: isAdmin };
+        } else if (isAdmin && !profile.is_admin) {
+           const pRows = ss.getSheetByName('profiles').getDataRange().getValues();
+           const pHeaders = pRows[0].map(h => normalizeHeader(h));
+           const pRowIdx = pRows.findIndex((r, idx) => idx > 0 && String(r[0]).toLowerCase() === email);
+           if (pRowIdx > -1 && pHeaders.indexOf('is_admin') > -1) {
+             ss.getSheetByName('profiles').getRange(pRowIdx + 1, pHeaders.indexOf('is_admin') + 1).setValue(true);
+             profile.is_admin = true;
+           }
+        }
+        return jsonResponse({ session: { user: { id: email, email: email } }, profile: profile });
+      }
+      return jsonResponse({ error: 'Neplatný nebo vypršelý odkaz.' });
+    }
+
+    // ✅ LOGIN via GET (fixes "Load Failed" CORS issue with POST)
+    if (action === 'login') {
+      const email = String(e.parameter.email || '').toLowerCase().trim();
+      if (!email) return jsonResponse({ error: 'Email chybí.' });
+      const profiles = getSheetData('profiles');
+      let profile = profiles.find(p => String(p.id || p.Id).toLowerCase() === email);
+      const isAdmin = email === 'luciesteffkova@gmail.com';
+      
+      if (!profile) {
+        const sheet = ss.getSheetByName('profiles');
+        sheet.appendRow([email, email.split('@')[0], '', isAdmin, new Date()]);
+        profile = { id: email, name: email.split('@')[0], is_admin: isAdmin };
+      } else if (isAdmin && !profile.is_admin) {
+           const pRows = ss.getSheetByName('profiles').getDataRange().getValues();
+           const pHeaders = pRows[0].map(h => normalizeHeader(h));
+           const pRowIdx = pRows.findIndex((r, idx) => idx > 0 && String(r[0]).toLowerCase() === email);
+           if (pRowIdx > -1 && pHeaders.indexOf('is_admin') > -1) {
+             ss.getSheetByName('profiles').getRange(pRowIdx + 1, pHeaders.indexOf('is_admin') + 1).setValue(true);
+             profile.is_admin = true;
+           }
+      }
+      return jsonResponse({ session: { user: { id: email, email: email } }, profile: profile });
+    }
+
     return jsonResponse({ error: 'Invalid action: ' + action });
   } catch (err) {
     return jsonResponse({ error: err.toString(), stack: err.stack });
@@ -154,8 +214,12 @@ function doPost(e) {
       
       MailApp.sendEmail({
         to: email,
-        subject: "Přihlášení - Vibe Coding Ostrava",
-        htmlBody: `<h3>Vítej ve Vibe Coding Ostrava!</h3><p>Pro přihlášení klikni na následující odkaz:</p><p><a href="${loginUrl}" style="padding: 10px 20px; background-color: #9333ea; color: white; text-decoration: none; border-radius: 5px;">Přihlásit se</a></p><p>Pokud jsi o tento e-mail nežádal/a, můžeš ho ignorovat.</p>`
+        subject: "Tvůj přihlašovací odkaz čeká 👾",
+        htmlBody: `<h3>Vítej, Vibe Codere! 👋</h3>
+<p>Někdo (doufáme, že ty) chce skočit dovnitř. Tady je tvůj odkaz:</p>
+<p><a href="${loginUrl}" style="padding: 12px 24px; background-color: #9333ea; color: white; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block;">👉 Přihlásit se</a></p>
+<p>Odkaz vyprší za 15 minut — tak na co čekáš?</p>
+<p style="color: #666; font-size: 0.9em; margin-top: 20px;">Pokud jsi o přihlášení nežádal/a, prostě to ignoruj. Nic se nestane.</p>`
       });
       
       return jsonResponse({ success: true });
